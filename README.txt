@@ -6,7 +6,7 @@ Backend:
 - Firebase Authentication = Admin/Captain/Rider login only
 - Firebase Firestore = NOT USED
 - Firebase Storage = NOT USED
-- Product/logo/gallery images use public HTTPS image URLs
+- Product images are selected from the admin PC and compressed into RTDB; no product image URL is required
 
 Firebase setup
 --------------
@@ -79,3 +79,13 @@ ADMIN/RULES COMPATIBILITY FIX
 - admins/{uid}/isAdmin=true supported.
 - admin.html authorization supports both formats.
 - database.rules.json is the matching RTDB rules file.
+
+
+UPDATES IN THIS VERSION
+- Admin can change WhatsApp number from Settings.
+- Admin can set delivery charge, enable/disable it, and set free-delivery threshold.
+- Customer order total includes delivery charge and free-delivery logic.
+- Product images can be selected directly from a PC; the browser compresses them before saving.
+- Rider dashboard redesigned with duty ON/OFF, active/out-for-delivery/delivered/today counters, payment method/status, items, delivery fee, total, call and navigation.
+- Rider assignment requires ON DUTY + recent GPS.
+- Customer order placement is more resilient: a live-location write failure no longer turns a successfully-created order into an apparent order error.

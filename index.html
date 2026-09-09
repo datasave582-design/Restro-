@@ -358,6 +358,7 @@ db.ref('settings/restaurant').on('value', snap => {
   const s=snap.val()||{};
   if(s.businessName) CONFIG.businessName=s.businessName;
   if(s.phone) CONFIG.phone=s.phone;
+  if(s.whatsapp) CONFIG.whatsapp=String(s.whatsapp).replace(/\D/g,'');
   if(s.address) CONFIG.address=s.address;
   if(s.mapsUrl) CONFIG.mapsUrl=s.mapsUrl;
   if(s.logoUrl){ const logos=document.querySelectorAll('[data-restaurant-logo]'); logos.forEach(el=>el.src=s.logoUrl); }
@@ -366,8 +367,10 @@ db.ref('settings/restaurant').on('value', snap => {
   const fm=document.getElementById('footMaps'); if(fm && CONFIG.mapsUrl) fm.href=CONFIG.mapsUrl;
 });
 
-let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:''};
-db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); });
+let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:'',deliveryEnabled:true,deliveryCharge:30,freeDeliveryAbove:300};
+db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); renderOrderCart(); });
+function deliveryChargeFor(subtotal){ if(PAYMENT_SETTINGS.deliveryEnabled===false) return 0; const free=Number(PAYMENT_SETTINGS.freeDeliveryAbove||0); if(free>0 && subtotal>=free)return 0; return Math.max(0,Number(PAYMENT_SETTINGS.deliveryCharge||0)); }
+function orderTotals(){ const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0); const delivery=deliveryChargeFor(subtotal); return {subtotal,delivery,total:subtotal+delivery}; }
 function cartEffectiveUpi(){
   const ids=[...new Set(orderCart.map(x=>String(x.upiId||'').trim()).filter(Boolean))];
   return ids.length===1?ids[0]:(PAYMENT_SETTINGS.upiId||'');
@@ -384,7 +387,7 @@ function refreshPaymentUI(){
   if(box){box.style.display=sel.value==='upi'?'block':'none'; const id=document.getElementById('upiIdDisplay'); if(id)id.textContent=upi||'UPI not configured'; const name=document.getElementById('upiNameDisplay'); if(name)name.textContent=PAYMENT_SETTINGS.upiName||CONFIG.businessName;}
   const utr=document.getElementById('utrWrap'); if(utr)utr.style.display=sel.value==='upi'?'block':'none';
   const rz=document.getElementById('razorpayNote'); if(rz)rz.style.display=sel.value==='razorpay'?'block':'none';
-  const a=document.getElementById('upiPayLink'); const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0); if(a&&upi){a.href='upi://pay?pa='+encodeURIComponent(upi)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}
+  const a=document.getElementById('upiPayLink'); const total=orderTotals().total; if(a&&upi){a.href='upi://pay?pa='+encodeURIComponent(upi)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}
 }
 
 db.ref('products').on('value', snap => {
@@ -936,8 +939,9 @@ const orderDone=document.getElementById('orderDone');
 function renderOrderCart(){
   const box=document.getElementById('cartItems');
   if(!orderCart.length){box.innerHTML='<div class="modal-sub">Your cart is empty. Add items from the menu.</div>';return}
-  const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
-  box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><b>Total</b><b>₹${total}</b></div>`;
+  const t=orderTotals();
+  box.innerHTML=orderCart.map(x=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${(x.price*x.qty).toFixed(0)}</b></div>`).join('')+
+  `<div style="display:grid;gap:7px;padding-top:12px"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><b>₹${t.subtotal.toFixed(0)}</b></div><div style="display:flex;justify-content:space-between"><span>Delivery</span><b>${t.delivery?`₹${t.delivery.toFixed(0)}`:'FREE'}</b></div><div style="display:flex;justify-content:space-between;font-size:1.08em;border-top:1px solid #ddd;padding-top:8px"><b>Total</b><b>₹${t.total.toFixed(0)}</b></div>${Number(PAYMENT_SETTINGS.freeDeliveryAbove||0)>0?`<small class="modal-sub">${t.delivery===0?'🎉 Free delivery applied':'Free delivery on orders ₹'+Number(PAYMENT_SETTINGS.freeDeliveryAbove).toFixed(0)+'+'}</small>`:''}</div>`;
 }
 function addToOrder(name,price,upiId){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
 window.addToOrder=addToOrder;
@@ -945,7 +949,7 @@ if(orderOpen)orderOpen.onclick=()=>{renderOrderCart();orderOverlay.classList.add
 if(orderClose)orderClose.onclick=()=>orderOverlay.classList.remove('open');
 if(orderDone)orderDone.onclick=()=>{orderOverlay.classList.remove('open');if(locationWatchId!=null&&navigator.geolocation){navigator.geolocation.clearWatch(locationWatchId);locationWatchId=null;}};
 if(orderOverlay)orderOverlay.addEventListener('click',e=>{if(e.target===orderOverlay)orderOverlay.classList.remove('open')});
-document.getElementById('oPayment').addEventListener('change',()=>{refreshPaymentUI();const u=cartEffectiveUpi(),a=document.getElementById('upiPayLink');const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0);if(a&&u){a.href='upi://pay?pa='+encodeURIComponent(u)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}});
+document.getElementById('oPayment').addEventListener('change',()=>{refreshPaymentUI();const u=cartEffectiveUpi(),a=document.getElementById('upiPayLink');const total=orderTotals().total;if(a&&u){a.href='upi://pay?pa='+encodeURIComponent(u)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}});
 
 document.getElementById('useGps').onclick=()=>{
   const st=document.getElementById('gpsStatus');st.textContent='Getting location…';
@@ -964,12 +968,12 @@ document.getElementById('orderForm').onsubmit=async e=>{
   const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
   try{
     const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
-    const paymentMethod=document.getElementById('oPayment').value; if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
+    const totals=orderTotals(); const subtotal=totals.subtotal, deliveryCharge=totals.delivery, total=totals.total;
+    const paymentMethod=document.getElementById('oPayment').value; if(!paymentMethod){throw Error('No payment method is currently available. Please contact the restaurant.');} if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
     const locationToken=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const paymentStatus=paymentMethod==='cod'?'cod_pending':'pending';
-    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
-    activeLocationOrderId=refId;activeLocationToken=locationToken;await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken});
+    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,subtotal,deliveryCharge,deliveryFree:deliveryCharge===0,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
+    activeLocationOrderId=refId;activeLocationToken=locationToken;try{await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken})}catch(locationError){console.warn('Live location could not be saved; order was placed.',locationError)}
     document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
     if(paymentMethod==='razorpay'&&PAYMENT_SETTINGS.razorpayKeyId){
       setTimeout(()=>{
@@ -994,7 +998,7 @@ document.getElementById('orderForm').onsubmit=async e=>{
     document.getElementById('gpsStatus').textContent='GPS not set';
     document.getElementById('cartItems').innerHTML='';
     const b=document.getElementById('orderSubmit'); b.disabled=false; b.textContent='Place Order';
-  }catch(x){console.error(x);err.textContent='Order failed. Please try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
+  }catch(x){console.error(x);err.textContent='Order could not be placed. Please check your details/payment and try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
 };
 let activeLocationOrderId=null,activeLocationToken=null,locationWatchId=null;
 const shareBtn=document.getElementById('shareLiveLocation'); if(shareBtn)shareBtn.onclick=()=>{if(!activeLocationOrderId)return alert('Place an order first.');if(!navigator.geolocation)return alert('GPS unavailable');navigator.geolocation.getCurrentPosition(p=>{db.ref('customerLocations/'+activeLocationOrderId).set({latitude:p.coords.latitude,longitude:p.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}).then(()=>{document.getElementById('liveTrackStatus').textContent='Live location shared ✓';if(locationWatchId==null)locationWatchId=navigator.geolocation.watchPosition(pos=>db.ref('customerLocations/'+activeLocationOrderId).update({latitude:pos.coords.latitude,longitude:pos.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}),()=>{}, {enableHighAccuracy:true,maximumAge:5000,timeout:10000})})},()=>alert('Please allow location permission'),{enableHighAccuracy:true,timeout:10000,maximumAge:0});};
