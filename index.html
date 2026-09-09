@@ -298,15 +298,15 @@
   Uses Firebase compat SDKs (no build step needed). Fill FIREBASE_CONFIG
   below with your project's config from Firebase Console > Project Settings.
   Also required in Firebase Console:
-  1. Firestore Database > Create database (production mode is fine).
-  2. Firestore Rules — allow public create, block public read (see rules
+  1. Realtime Database > Create Database.
+  2. Realtime Database Rules — use the included database.rules.json.
      snippet in the chat / README).
   3. Authentication > Sign-in method > enable Email/Password, then
      Authentication > Users > Add user to create your admin login
      (this same login is used on admin.html).
 ============================================================================= -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -342,6 +342,7 @@ function waLink(message){
    (Firebase Console > Project Settings > General > Your apps > SDK setup). */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",
+  databaseURL: "https://restro-56bc7-default-rtdb.firebaseio.com",
   authDomain: "restro-56bc7.firebaseapp.com",
   projectId: "restro-56bc7",
   storageBucket: "restro-56bc7.firebasestorage.app",
@@ -350,7 +351,17 @@ const FIREBASE_CONFIG = {
   measurementId: "G-X3QF67PKXS"
 };
 firebase.initializeApp(FIREBASE_CONFIG);
-const db = firebase.firestore();
+const db = firebase.database();
+
+// Realtime public menu: Admin changes products here are reflected on the customer site.
+db.ref('products').on('value', snap => {
+  const val=snap.val()||{};
+  const live=Object.values(val).filter(x=>x && x.active!==false);
+  if(!live.length) return;
+  const box=document.getElementById('dishScroller');
+  if(!box) return;
+  box.innerHTML=live.map(d=>`<div class="dish-card"><div class="dish-img">${d.image?`<img src="${String(d.image).replace(/"/g,'&quot;')}" alt="${String(d.name||'').replace(/"/g,'&quot;')}">`:''}<span class="veg-dot"></span></div><div class="dish-body"><h3>${String(d.name||'')}</h3><p>${String(d.description||'')}</p><div class="dish-foot"><span class="price">₹${Number(d.price||0)}</span><button class="add-btn" onclick="addToOrder('${String(d.name||'').replace(/'/g,"\\'")}',${Number(d.price||0)})">Add to Order</button></div></div></div>`).join('');
+});
 
 /* ================= RESERVATION SETTINGS =================
    Edit to match real service hours / booking rules. */
@@ -668,7 +679,7 @@ document.getElementById("reviewCountNum").textContent = totalReviews ? totalRevi
 
 // WhatsApp links (prefilled messages, per spec section 9)
 document.getElementById("waHero").href = waLink(`Hello ${CONFIG.businessName}, I would like to know about today's menu.`);
-document.getElementById("waOrder").href = waLink(`Hello ${CONFIG.businessName}, I would like to place an order.`);
+const waOrder=document.getElementById("waOrder"); if(waOrder) waOrder.href = waLink(`Hello ${CONFIG.businessName}, I would like to place an order.`);
 document.getElementById("waReserve").href = waLink(`Hello ${CONFIG.businessName}, I would like to book a table.`);
 document.getElementById("waFloat").href = waLink(`Hello ${CONFIG.businessName}, I have a question.`);
 document.getElementById("waNav").href = waLink(`Hello ${CONFIG.businessName}, I have a question.`);
@@ -698,7 +709,7 @@ document.getElementById("dishScroller").innerHTML = DISHES.map(d => `
       <p>${d.desc}</p>
       <div class="dish-foot">
         <span class="price">${d.price}</span>
-        <button class="add-btn" onclick="window.open(waLink('Hello ${CONFIG.businessName}, I would like to order: ${d.name}'), '_blank')">Add to Order</button>
+        <button class="add-btn" onclick="addToOrder('${String(d.name).replace(/'/g,"\\'")}', Number(String('${d.price}').replace(/[^0-9.]/g,'')))">Add to Order</button>
       </div>
     </div>
   </div>
@@ -837,11 +848,11 @@ reserveForm.addEventListener("submit", async (e) => {
     name, phone: phoneDigits, date, time,
     guests: Number(guests), notes,
     status: "pending",
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    createdAt: Date.now()
   };
 
   try{
-    await db.collection("reservations").add(booking);
+    const bookingId="r_"+Date.now()+"_"+Math.random().toString(36).slice(2,7); await db.ref("reservations/"+bookingId).set(booking);
     showReservationSuccess(booking);
   }catch(err){
     console.error("Reservation save failed:", err);
@@ -914,9 +925,9 @@ document.getElementById('orderForm').onsubmit=async e=>{
   if(!Number.isFinite(lat)||!Number.isFinite(lng)){err.textContent='Please tap Use My GPS before placing the order.';err.classList.add('show');return}
   const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
   try{
-    const ref=db.collection('orders').doc();const orderNo='BA'+Date.now().toString().slice(-8);
+    const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
-    await ref.set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod:document.getElementById('oPayment').value,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod:document.getElementById('oPayment').value,status:'pending',createdAt:Date.now()});
     document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
     orderCart=[];
   }catch(x){console.error(x);err.textContent='Order failed. Please try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
