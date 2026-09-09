@@ -292,6 +292,15 @@
   .success-summary span:first-child{color:#7a6c62;}
   .success-summary span:last-child{font-weight:700;}
   .success-actions{display:flex;flex-direction:column;gap:10px;}
+  .auth-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font-weight:700;font-size:.82rem;}
+  .auth-chip.logged{border-color:var(--olive);background:#f1f6ed;}
+  .auth-overlay{position:fixed;inset:0;background:rgba(24,18,15,.58);display:none;align-items:flex-end;justify-content:center;z-index:1200;padding:0;}
+  .auth-overlay.open{display:flex;}
+  .auth-card{width:min(560px,100%);background:var(--paper);border-radius:22px 22px 0 0;padding:26px 22px 30px;box-shadow:0 -20px 60px rgba(0,0,0,.2);}
+  @media(min-width:700px){.auth-overlay{align-items:center;padding:20px}.auth-card{border-radius:18px;padding:30px;}}
+  .auth-tabs{display:flex;gap:8px;margin:18px 0}.auth-tab{flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;font-weight:800;background:#fff}.auth-tab.active{background:var(--wine);color:#fff;border-color:var(--wine);}
+  .auth-note{font-size:.82rem;color:#75685f;margin:7px 0 16px;line-height:1.5}.auth-error{display:none;color:#8c1732;background:#fff0f2;border:1px solid #efc4cd;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.84rem}.auth-error.show{display:block;}
+  .user-menu{display:flex;align-items:center;gap:8px;margin-left:auto;}
 </style>
 
 <!-- ================= FIREBASE (Phase 2 — Table Reservations) =================
@@ -307,6 +316,7 @@
 ============================================================================= -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -352,6 +362,8 @@ const FIREBASE_CONFIG = {
 };
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
+const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 
 // Realtime public menu: Admin changes products here are reflected on the customer site.
 db.ref('settings/restaurant').on('value', snap => {
@@ -562,6 +574,7 @@ const RESERVE_CONFIG = {
 </a>
 
 <!-- ================= STICKY MOBILE BOTTOM NAV ================= -->
+<div class="user-menu" style="position:fixed;right:14px;top:14px;z-index:1100;"><button id="customerAccountBtn" class="auth-chip" type="button">👤 Login</button></div>
 <nav class="mobile-nav" aria-label="Mobile primary">
   <a href="#home" class="active">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
@@ -584,6 +597,24 @@ const RESERVE_CONFIG = {
     WhatsApp
   </a>
 </nav>
+
+<!-- ================= CUSTOMER AUTH MODAL ================= -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="modal-close" id="authClose" aria-label="Close">✕</button>
+    <h2 id="authTitle">Welcome to Bon Amigos</h2>
+    <p class="modal-sub" id="authSubtitle">Login to order food or book a table.</p>
+    <div class="auth-tabs"><button type="button" class="auth-tab active" id="loginTab">Login</button><button type="button" class="auth-tab" id="signupTab">Create account</button></div>
+    <form id="customerAuthForm" novalidate>
+      <div class="form-field"><label>Email Address</label><input id="authEmail" type="email" required autocomplete="email" placeholder="you@example.com"></div>
+      <div class="form-field" id="authMobileWrap" style="display:none"><label>Mobile Number</label><input id="authMobile" type="tel" autocomplete="tel" placeholder="10-digit mobile number"></div>
+      <div class="form-field"><label>Password</label><input id="authPassword" type="password" required autocomplete="current-password" placeholder="Minimum 6 characters"></div>
+      <div id="authError" class="auth-error"></div>
+      <button class="btn btn-primary" id="authSubmit" type="submit">Login</button>
+    </form>
+    <p class="auth-note">Your email login stays signed in on this device, so you normally won't need to log in again. You can log out anytime.</p>
+  </div>
+</div>
 
 <!-- ================= ONLINE ORDER MODAL ================= -->
 <div class="modal-overlay" id="orderOverlay">
@@ -653,6 +684,12 @@ const RESERVE_CONFIG = {
 
         <button type="submit" class="btn btn-primary modal-submit" id="reserveSubmit">Request Table</button>
       </form>
+    </div>
+
+    <div id="myTableStatus" style="display:none;margin:0 0 16px;padding:16px;border:1px solid #e6d7c8;border-radius:14px;background:#fbf7f1;box-shadow:0 8px 24px rgba(45,30,20,.06);">
+      <div style="font-weight:800;font-size:18px;" id="myTableStatusTitle">Table request status</div>
+      <div id="myTableStatusText" class="modal-sub" style="margin-top:6px;"></div>
+      <div id="myTableStatusMeta" style="margin-top:10px;font-weight:700;"></div>
     </div>
 
     <div id="reserveSuccessView" class="success-state" style="display:none;">
@@ -791,14 +828,18 @@ reserveOverlay.addEventListener("click", (e) => { if (e.target === reserveOverla
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && reserveOverlay.classList.contains("open")) closeReserveModal(); });
 
 function openReserveModal(){
+  if(!auth.currentUser){ pendingCustomerAction="reserve"; openCustomerAuth(); return; }
   reserveFormView.style.display = "";
   reserveSuccess.style.display = "none";
+  const statusBox=document.getElementById('myTableStatus'); if(statusBox && auth.currentUser) statusBox.style.display='block';
   reserveError.classList.remove("show");
   reserveSubmitBtn.disabled = false;
   reserveSubmitBtn.textContent = "Request Table";
   populateGuestOptions();
   setMinDate();
   populateTimeSlots();
+  const profile=customerProfile||{};
+  document.getElementById("rPhone").value=profile.mobile||document.getElementById("rPhone").value||"";
   reserveOverlay.classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -856,6 +897,7 @@ function populateTimeSlots(){
 
 reserveForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if(!auth.currentUser){ pendingCustomerAction="reserve"; closeReserveModal(); openCustomerAuth(); return; }
   reserveError.classList.remove("show");
 
   const name   = document.getElementById("rName").value.trim();
@@ -883,7 +925,10 @@ reserveForm.addEventListener("submit", async (e) => {
   const booking = {
     name, phone: phoneDigits, date, time,
     guests: Number(guests), notes,
+    customerUid: auth.currentUser.uid,
+    customerEmail: auth.currentUser.email || "",
     status: "pending",
+    customerVisibleStatus: "request_received",
     createdAt: Date.now()
   };
 
@@ -892,7 +937,7 @@ reserveForm.addEventListener("submit", async (e) => {
     showReservationSuccess(booking);
   }catch(err){
     console.error("Reservation save failed:", err);
-    reserveError.textContent = "Something went wrong. Please try again, or book directly via WhatsApp below.";
+    reserveError.textContent = (err && err.code === 'PERMISSION_DENIED') ? 'Firebase permission denied. Please publish the latest database.rules.json, then try again.' : "Something went wrong. Please try again, or book directly via WhatsApp below.";
     reserveError.classList.add("show");
     reserveSubmitBtn.disabled = false;
     reserveSubmitBtn.textContent = "Request Table";
@@ -919,12 +964,91 @@ function showReservationSuccess(booking){
     + (booking.notes ? `\nNote: ${booking.notes}` : "");
   document.getElementById("successWaBtn").href = waLink(waMsg);
 }
+
+/* ================= LIVE TABLE REQUEST STATUS =================
+   Customers can see only their own reservation records. Staff changes are
+   reflected here in realtime: waiting -> confirmed/table -> seated -> completed. */
+let waitingDisplay={};
+db.ref('waitingDisplay').on('value',s=>{waitingDisplay=s.val()||{};});
+let lastReservationStatus={};
+let myReservationListener=null;
+function watchMyTableReservations(){
+  const u=auth.currentUser;
+  if(!u || !db) return;
+  if(myReservationListener) db.ref('reservations').orderByChild('customerUid').equalTo(u.uid).off('value',myReservationListener);
+  myReservationListener=snap=>{
+    const all=snap.val()||{};
+    const mine=Object.entries(all).map(([id,v])=>({id,...(v||{})})).filter(x=>x.customerUid===u.uid);
+    Object.entries(all).forEach(([id,v])=>{if(v&&v.status==='completed' && lastReservationStatus[id] && lastReservationStatus[id]!=='completed'){showDiningCompleteMessage();} if(v) lastReservationStatus[id]=v.status||'';});
+    mine.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    const current=mine.find(x=>!['cancelled','completed'].includes(x.status||''));
+    const completed=mine.find(x=>x.status==='completed' && lastReservationStatus[x.id]==='completed');
+    const box=document.getElementById('myTableStatus');
+    if(!box) return;
+    if(!current){box.style.display='none';return;}
+    box.style.display='block';
+    const title=document.getElementById('myTableStatusTitle'),text=document.getElementById('myTableStatusText'),meta=document.getElementById('myTableStatusMeta');
+    const tableNo=current.tableNumber || '';
+    const queue=(waitingDisplay.queue||[]);
+    const qItem=queue.find(q=>q.id===current.id);
+    const liveWaitPosition=qItem?.position || current.waitPosition || null;
+    if(current.status==='waiting' || (current.status==='pending' && Number(waitingDisplay.freeTables||0)===0)){
+      current.status='waiting';
+      title.textContent='⏳ Please wait — all tables are busy';
+      text.textContent='Your table request is safely in the waiting queue. We will assign a table as soon as one becomes available.';
+      meta.textContent=liveWaitPosition ? `Waiting position: #${liveWaitPosition}` : 'Waiting position is updating live.';
+    }else if(current.status==='confirmed' || current.status==='reserved'){
+      title.textContent='🎉 Your table is ready';
+      text.textContent='Your table request has been accepted. Please come to the restaurant / waiting area.';
+      meta.textContent=tableNo ? `Your Table: ${tableNo}` : 'Table assigned — please ask the captain.';
+    }else if(current.status==='seated'){
+      title.textContent='🍽️ Enjoy your meal';
+      text.textContent='You are seated. Your table will disappear from this status when the captain frees it after your meal.';
+      meta.textContent=tableNo ? `Table ${tableNo} • Seated` : 'Seated';
+    }else{
+      title.textContent='✓ Request received';
+      text.textContent='Your table request has been received. We are checking availability now.';
+      meta.textContent='Status: Waiting for confirmation';
+    }
+  };
+  db.ref('reservations').orderByChild('customerUid').equalTo(u.uid).on('value',myReservationListener);
+}
+function showDiningCompleteMessage(){
+  const key='ba_dining_thanks_shown';
+  if(sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key,'1');
+  const box=document.getElementById('myTableStatus');
+  if(box){box.style.display='block';document.getElementById('myTableStatusTitle').textContent=`💛 Thanks for dining at ${CONFIG.businessName}`;document.getElementById('myTableStatusText').textContent='We hope you had a wonderful time. We look forward to seeing you again!';document.getElementById('myTableStatusMeta').textContent='Your table request is now closed.';setTimeout(()=>box.style.display='none',9000);}
+}
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
 
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}</script>
+
+<script>
+/* ================= CUSTOMER AUTHENTICATION ================= */
+let pendingCustomerAction=null;
+let customerProfile={};
+const authOverlay=document.getElementById('authOverlay');
+const authForm=document.getElementById('customerAuthForm');
+const loginTab=document.getElementById('loginTab');
+const signupTab=document.getElementById('signupTab');
+const authMobileWrap=document.getElementById('authMobileWrap');
+const authSubmit=document.getElementById('authSubmit');
+const authError=document.getElementById('authError');
+const accountBtn=document.getElementById('customerAccountBtn');
+let authMode='login';
+function openCustomerAuth(mode='login'){authMode=mode;updateAuthMode();authError.classList.remove('show');authOverlay.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('authEmail').focus(),50);}
+function closeCustomerAuth(){authOverlay.classList.remove('open');if(!reserveOverlay.classList.contains('open')&&!orderOverlay.classList.contains('open'))document.body.style.overflow='';}
+function updateAuthMode(){const signup=authMode==='signup';loginTab.classList.toggle('active',!signup);signupTab.classList.toggle('active',signup);authMobileWrap.style.display=signup?'':'none';authSubmit.textContent=signup?'Create account':'Login';document.getElementById('authTitle').textContent=signup?'Create your Bon Amigos account':'Welcome back';document.getElementById('authSubtitle').textContent=signup?'Add your email and mobile once, then you can order and book easily.':'Login to order food or book a table.';document.getElementById('authPassword').autocomplete=signup?'new-password':'current-password';}
+loginTab.onclick=()=>{authMode='login';updateAuthMode()};signupTab.onclick=()=>{authMode='signup';updateAuthMode()};
+document.getElementById('authClose').onclick=closeCustomerAuth;authOverlay.addEventListener('click',e=>{if(e.target===authOverlay)closeCustomerAuth()});
+accountBtn.onclick=()=>{if(auth.currentUser){if(confirm('Log out from Bon Amigos?'))auth.signOut();}else openCustomerAuth('login')};
+authForm.onsubmit=async e=>{e.preventDefault();authError.classList.remove('show');const email=document.getElementById('authEmail').value.trim();const password=document.getElementById('authPassword').value;const mobile=document.getElementById('authMobile').value.replace(/\D/g,'');if(!email||!password){authError.textContent='Please enter your email and password.';authError.classList.add('show');return;}if(authMode==='signup'&&mobile.length<10){authError.textContent='Please enter a valid 10-digit mobile number.';authError.classList.add('show');return;}authSubmit.disabled=true;authSubmit.textContent=authMode==='signup'?'Creating…':'Logging in…';try{let cred;if(authMode==='signup'){cred=await auth.createUserWithEmailAndPassword(email,password);await db.ref('customers/'+cred.user.uid).set({email,mobile,createdAt:Date.now(),updatedAt:Date.now()});customerProfile={email,mobile};}else{cred=await auth.signInWithEmailAndPassword(email,password);const snap=await db.ref('customers/'+cred.user.uid).once('value');customerProfile=snap.val()||{};}closeCustomerAuth();authSubmit.disabled=false;updateAuthMode();if(pendingCustomerAction==='order'){pendingCustomerAction=null;renderOrderCart();orderOverlay.classList.add('open');document.body.style.overflow='hidden';}else if(pendingCustomerAction==='reserve'){pendingCustomerAction=null;openReserveModal();}}catch(err){console.error(err);let msg=err.message||'Login failed.';if(err.code==='auth/email-already-in-use')msg='This email is already registered. Please use Login.';if(err.code==='auth/invalid-credential')msg='Incorrect email or password.';if(err.code==='auth/weak-password')msg='Password must be at least 6 characters.';authError.textContent=msg;authError.classList.add('show');}finally{authSubmit.disabled=false;updateAuthMode();}};
+auth.onAuthStateChanged(async user=>{if(user){try{const snap=await db.ref('customers/'+user.uid).once('value');customerProfile=snap.val()||{};}catch(e){customerProfile={};}accountBtn.textContent='👤 '+(customerProfile.mobile||user.email||'Account');accountBtn.classList.add('logged');watchMyTableReservations();}else{customerProfile={};accountBtn.textContent='👤 Login';accountBtn.classList.remove('logged');if(myReservationListener){db.ref('reservations').orderByChild('customerUid').equalTo(u.uid).off('value',myReservationListener);myReservationListener=null;}}});
+</script>
 
 <script>
 /* ================= ONLINE ORDERING ================= */
@@ -939,9 +1063,9 @@ function renderOrderCart(){
   const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0);const delivery=DELIVERY_SETTINGS.enabled!==false?(subtotal>=Number(DELIVERY_SETTINGS.freeThreshold||0)?0:Number(DELIVERY_SETTINGS.fee||0)):0;const total=subtotal+delivery;
   box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><span>Subtotal</span><b>₹${subtotal}</b></div><div style="display:flex;justify-content:space-between;padding-top:6px"><span>Delivery</span><b>${delivery?'₹'+delivery:'FREE'}</b></div><div style="display:flex;justify-content:space-between;padding-top:10px;font-size:18px"><b>Total</b><b>₹${total}</b></div>`;
 }
-function addToOrder(name,price,upiId){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
+function addToOrder(name,price,upiId){if(!auth.currentUser){pendingCustomerAction='order';openCustomerAuth();return;}const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
 window.addToOrder=addToOrder;
-if(orderOpen)orderOpen.onclick=()=>{renderOrderCart();orderOverlay.classList.add('open')};
+if(orderOpen)orderOpen.onclick=()=>{if(!auth.currentUser){pendingCustomerAction='order';openCustomerAuth();return;}renderOrderCart();orderOverlay.classList.add('open')};
 if(orderClose)orderClose.onclick=()=>orderOverlay.classList.remove('open');
 if(orderDone)orderDone.onclick=()=>{orderOverlay.classList.remove('open');if(locationWatchId!=null&&navigator.geolocation){navigator.geolocation.clearWatch(locationWatchId);locationWatchId=null;}};
 if(orderOverlay)orderOverlay.addEventListener('click',e=>{if(e.target===orderOverlay)orderOverlay.classList.remove('open')});
@@ -955,12 +1079,13 @@ document.getElementById('useGps').onclick=()=>{
     try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.coords.latitude}&lon=${p.coords.longitude}`);const j=await r.json();if(j.display_name){document.getElementById('oGpsAddress').value=j.display_name;if(!document.getElementById('oAddress').value)document.getElementById('oAddress').value=j.display_name}}catch(e){}
   },()=>{st.textContent='Please allow location permission'}, {enableHighAccuracy:true,timeout:10000,maximumAge:0});
 };
+document.querySelectorAll('a[href="#order"]').forEach(a=>a.addEventListener('click',e=>{if(!auth.currentUser){e.preventDefault();pendingCustomerAction='order';openCustomerAuth();}}));
 document.getElementById('orderForm').onsubmit=async e=>{
-  e.preventDefault();const err=document.getElementById('orderError');err.classList.remove('show');
+  e.preventDefault();if(!auth.currentUser){pendingCustomerAction='order';orderOverlay.classList.remove('open');openCustomerAuth();return;}const err=document.getElementById('orderError');err.classList.remove('show');
   if(!orderCart.length){err.textContent='Please add at least one item.';err.classList.add('show');return}
   const phone=document.getElementById('oPhone').value.replace(/\D/g,'');const lat=Number(document.getElementById('oLat').value),lng=Number(document.getElementById('oLng').value);
   if(phone.length<10){err.textContent='Enter a valid mobile number.';err.classList.add('show');return}
-  if(!Number.isFinite(lat)||!Number.isFinite(lng)){err.textContent='Please tap Use My GPS before placing the order.';err.classList.add('show');return}
+  if(!document.getElementById('oAddress').value.trim()){err.textContent='Please enter your delivery address.';err.classList.add('show');return}
   const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
   try{
     const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
@@ -968,8 +1093,9 @@ document.getElementById('orderForm').onsubmit=async e=>{
     const paymentMethod=document.getElementById('oPayment').value; if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
     const locationToken=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const paymentStatus=paymentMethod==='cod'?'cod_pending':'pending';
-    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,subtotal,deliveryCharge,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
-    activeLocationOrderId=refId;activeLocationToken=locationToken;await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken});
+    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:Number.isFinite(lat)?lat:null,longitude:Number.isFinite(lng)?lng:null,items:orderCart,subtotal,deliveryCharge,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',customerUid:auth.currentUser.uid,customerEmail:auth.currentUser.email||'',locationToken,createdAt:Date.now()});
+    activeLocationOrderId=refId;activeLocationToken=locationToken;
+    if(Number.isFinite(lat)&&Number.isFinite(lng)){ try{ await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken}); }catch(locErr){ console.warn('Location save skipped:',locErr); } }
     document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
     if(paymentMethod==='razorpay'&&PAYMENT_SETTINGS.razorpayKeyId){
       setTimeout(()=>{
@@ -994,7 +1120,7 @@ document.getElementById('orderForm').onsubmit=async e=>{
     document.getElementById('gpsStatus').textContent='GPS not set';
     document.getElementById('cartItems').innerHTML='';
     const b=document.getElementById('orderSubmit'); b.disabled=false; b.textContent='Place Order';
-  }catch(x){console.error(x);err.textContent='Order failed. Please try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
+  }catch(x){console.error(x);err.textContent=(x && x.code==='PERMISSION_DENIED')?'Firebase permission denied. Please publish the latest database.rules.json and try again.':('Order failed: '+(x?.message||'Please try again.'));err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
 };
 let activeLocationOrderId=null,activeLocationToken=null,locationWatchId=null;
 const shareBtn=document.getElementById('shareLiveLocation'); if(shareBtn)shareBtn.onclick=()=>{if(!activeLocationOrderId)return alert('Place an order first.');if(!navigator.geolocation)return alert('GPS unavailable');navigator.geolocation.getCurrentPosition(p=>{db.ref('customerLocations/'+activeLocationOrderId).set({latitude:p.coords.latitude,longitude:p.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}).then(()=>{document.getElementById('liveTrackStatus').textContent='Live location shared ✓';if(locationWatchId==null)locationWatchId=navigator.geolocation.watchPosition(pos=>db.ref('customerLocations/'+activeLocationOrderId).update({latitude:pos.coords.latitude,longitude:pos.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}),()=>{}, {enableHighAccuracy:true,maximumAge:5000,timeout:10000})})},()=>alert('Please allow location permission'),{enableHighAccuracy:true,timeout:10000,maximumAge:0});};
