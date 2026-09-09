@@ -354,12 +354,45 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
 
 // Realtime public menu: Admin changes products here are reflected on the customer site.
+db.ref('settings/restaurant').on('value', snap => {
+  const s=snap.val()||{};
+  if(s.businessName) CONFIG.businessName=s.businessName;
+  if(s.phone) CONFIG.phone=s.phone;
+  if(s.address) CONFIG.address=s.address;
+  if(s.mapsUrl) CONFIG.mapsUrl=s.mapsUrl;
+  if(s.logoUrl){ const logos=document.querySelectorAll('[data-restaurant-logo]'); logos.forEach(el=>el.src=s.logoUrl); }
+  const set=(id,val)=>{const el=document.getElementById(id); if(el && val!=null) el.textContent=val;};
+  set('footAddress',CONFIG.address); set('footPhone',CONFIG.phone);
+  const fm=document.getElementById('footMaps'); if(fm && CONFIG.mapsUrl) fm.href=CONFIG.mapsUrl;
+});
+
+let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:''};
+db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); });
+function cartEffectiveUpi(){
+  const ids=[...new Set(orderCart.map(x=>String(x.upiId||'').trim()).filter(Boolean))];
+  return ids.length===1?ids[0]:(PAYMENT_SETTINGS.upiId||'');
+}
+function refreshPaymentUI(){
+  const sel=document.getElementById('oPayment'); if(!sel)return;
+  const current=sel.value;
+  sel.innerHTML='';
+  if(PAYMENT_SETTINGS.codEnabled!==false){sel.insertAdjacentHTML('beforeend','<option value="cod">Cash on Delivery</option>');}
+  if(cartEffectiveUpi())sel.insertAdjacentHTML('beforeend','<option value="upi">UPI / Pay by UPI</option>');
+  if(PAYMENT_SETTINGS.razorpayEnabled===true && PAYMENT_SETTINGS.razorpayKeyId)sel.insertAdjacentHTML('beforeend','<option value="razorpay">Razorpay</option>');
+  if([...sel.options].some(o=>o.value===current))sel.value=current; else if(sel.options.length)sel.selectedIndex=0;
+  const upi=cartEffectiveUpi(); const box=document.getElementById('upiBox');
+  if(box){box.style.display=sel.value==='upi'?'block':'none'; const id=document.getElementById('upiIdDisplay'); if(id)id.textContent=upi||'UPI not configured'; const name=document.getElementById('upiNameDisplay'); if(name)name.textContent=PAYMENT_SETTINGS.upiName||CONFIG.businessName;}
+  const utr=document.getElementById('utrWrap'); if(utr)utr.style.display=sel.value==='upi'?'block':'none';
+  const rz=document.getElementById('razorpayNote'); if(rz)rz.style.display=sel.value==='razorpay'?'block':'none';
+  const a=document.getElementById('upiPayLink'); const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0); if(a&&upi){a.href='upi://pay?pa='+encodeURIComponent(upi)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}
+}
+
 db.ref('products').on('value', snap => {
   const val=snap.val()||{};
   const live=Object.values(val).filter(x=>x && x.active!==false);
-  if(!live.length) return;
   const box=document.getElementById('dishScroller');
   if(!box) return;
+  if(!live.length){ box.innerHTML='<div class="menu-empty" style="padding:24px;text-align:center;width:100%;color:#75685f">Menu is being updated. Please check again shortly.</div>'; return; }
   box.innerHTML=live.map(d=>`<div class="dish-card"><div class="dish-img">${d.image?`<img src="${String(d.image).replace(/"/g,'&quot;')}" alt="${String(d.name||'').replace(/"/g,'&quot;')}">`:''}<span class="veg-dot"></span></div><div class="dish-body"><h3>${String(d.name||'')}</h3><p>${String(d.description||'')}</p><div class="dish-foot"><span class="price">₹${Number(d.price||0)}</span><button class="add-btn" onclick="addToOrder('${String(d.name||'').replace(/'/g,"\\'")}',${Number(d.price||0)})">Add to Order</button></div></div></div>`).join('');
 });
 
@@ -566,11 +599,14 @@ const RESERVE_CONFIG = {
         <div style="display:flex;gap:8px;align-items:center;margin:8px 0"><button type="button" class="btn btn-outline" id="useGps">📍 Use My GPS</button><span id="gpsStatus" class="modal-sub">GPS not set</span></div>
         <input type="hidden" id="oLat"><input type="hidden" id="oLng">
         <div class="form-field"><label>GPS / Location Address (optional)</label><input id="oGpsAddress" placeholder="Detected location name"></div>
-        <div class="form-field"><label>Payment</label><select id="oPayment"><option value="cod">Cash on Delivery</option><option value="online">Online Payment</option></select></div>
+        <div class="form-field"><label>Payment Method</label><select id="oPayment"></select></div>
+<div id="upiBox" style="display:none;background:#f3ece2;border:1px solid #ded2c5;border-radius:10px;padding:12px;margin:6px 0"><b>Pay to UPI</b><div id="upiNameDisplay" class="modal-sub"></div><div style="font-weight:800;margin:5px 0" id="upiIdDisplay"></div><a id="upiPayLink" class="btn btn-outline" href="#" style="display:inline-block" target="_blank">Open UPI App</a></div>
+<div id="utrWrap" style="display:none" class="form-field"><label>UPI Transaction / UTR No. (optional)</label><input id="oUtr" placeholder="Enter UTR after payment"></div>
+<div id="razorpayNote" style="display:none" class="modal-sub">Razorpay checkout will open after you place the order.</div>
         <div id="orderError" class="error-msg"></div><button class="btn btn-primary" id="orderSubmit" type="submit">Place Order</button>
       </form>
     </div>
-    <div id="orderSuccess" style="display:none"><h2>Order Placed 🎉</h2><p id="orderSuccessText"></p><button class="btn btn-primary" id="orderDone">Done</button></div>
+    <div id="orderSuccess" style="display:none"><h2>Order Placed 🎉</h2><p id="orderSuccessText"></p><p id="liveTrackStatus" class="modal-sub">Your GPS location has been sent to the restaurant.</p><button class="btn btn-outline" id="shareLiveLocation" type="button">📍 Share Live Location</button> <button class="btn btn-primary" id="orderDone">Done</button></div>
   </div>
 </div>
 
@@ -903,12 +939,14 @@ function renderOrderCart(){
   const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
   box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><b>Total</b><b>₹${total}</b></div>`;
 }
-function addToOrder(name,price){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1});renderOrderCart();orderOverlay.classList.add('open');}
+function addToOrder(name,price,upiId){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
 window.addToOrder=addToOrder;
 if(orderOpen)orderOpen.onclick=()=>{renderOrderCart();orderOverlay.classList.add('open')};
 if(orderClose)orderClose.onclick=()=>orderOverlay.classList.remove('open');
-if(orderDone)orderDone.onclick=()=>orderOverlay.classList.remove('open');
+if(orderDone)orderDone.onclick=()=>{orderOverlay.classList.remove('open');if(locationWatchId!=null&&navigator.geolocation){navigator.geolocation.clearWatch(locationWatchId);locationWatchId=null;}};
 if(orderOverlay)orderOverlay.addEventListener('click',e=>{if(e.target===orderOverlay)orderOverlay.classList.remove('open')});
+document.getElementById('oPayment').addEventListener('change',()=>{refreshPaymentUI();const u=cartEffectiveUpi(),a=document.getElementById('upiPayLink');const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0);if(a&&u){a.href='upi://pay?pa='+encodeURIComponent(u)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}});
+
 document.getElementById('useGps').onclick=()=>{
   const st=document.getElementById('gpsStatus');st.textContent='Getting location…';
   if(!navigator.geolocation){st.textContent='GPS unavailable';return}
@@ -927,11 +965,39 @@ document.getElementById('orderForm').onsubmit=async e=>{
   try{
     const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
     const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
-    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod:document.getElementById('oPayment').value,status:'pending',createdAt:Date.now()});
+    const paymentMethod=document.getElementById('oPayment').value; if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
+    const locationToken=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const paymentStatus=paymentMethod==='cod'?'cod_pending':'pending';
+    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
+    activeLocationOrderId=refId;activeLocationToken=locationToken;await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken});
     document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
+    if(paymentMethod==='razorpay'&&PAYMENT_SETTINGS.razorpayKeyId){
+      setTimeout(()=>{
+        try{
+          const sc=document.createElement('script'); sc.src='https://checkout.razorpay.com/v1/checkout.js';
+          sc.onload=()=>{
+            try{
+              const rz=new Razorpay({key:PAYMENT_SETTINGS.razorpayKeyId,amount:Math.round(total*100),currency:'INR',name:PAYMENT_SETTINGS.upiName||CONFIG.businessName,description:'Bon Amigos Order #'+orderNo,handler:async r=>{
+                await db.ref('orders/'+refId).update({paymentStatus:'submitted',razorpayPaymentId:r.razorpay_payment_id,updatedAt:Date.now()});
+                alert('Payment submitted. Restaurant will confirm it.');
+              }});
+              rz.open();
+            }catch(e){console.error(e);}
+          };
+          document.head.appendChild(sc);
+        }catch(e){console.error(e);}
+      },300);
+    }
     orderCart=[];
+    document.getElementById('orderForm').reset();
+    document.getElementById('oLat').value=''; document.getElementById('oLng').value='';
+    document.getElementById('gpsStatus').textContent='GPS not set';
+    document.getElementById('cartItems').innerHTML='';
+    const b=document.getElementById('orderSubmit'); b.disabled=false; b.textContent='Place Order';
   }catch(x){console.error(x);err.textContent='Order failed. Please try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
 };
+let activeLocationOrderId=null,activeLocationToken=null,locationWatchId=null;
+const shareBtn=document.getElementById('shareLiveLocation'); if(shareBtn)shareBtn.onclick=()=>{if(!activeLocationOrderId)return alert('Place an order first.');if(!navigator.geolocation)return alert('GPS unavailable');navigator.geolocation.getCurrentPosition(p=>{db.ref('customerLocations/'+activeLocationOrderId).set({latitude:p.coords.latitude,longitude:p.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}).then(()=>{document.getElementById('liveTrackStatus').textContent='Live location shared ✓';if(locationWatchId==null)locationWatchId=navigator.geolocation.watchPosition(pos=>db.ref('customerLocations/'+activeLocationOrderId).update({latitude:pos.coords.latitude,longitude:pos.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}),()=>{}, {enableHighAccuracy:true,maximumAge:5000,timeout:10000})})},()=>alert('Please allow location permission'),{enableHighAccuracy:true,timeout:10000,maximumAge:0});};
 </script>
 </body>
 </html>
