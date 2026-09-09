@@ -1,547 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard | Bon Amigos</title>
-<meta name="robots" content="noindex, nofollow">
-
-<!-- ============================================================
-  BON AMIGOS — ADMIN DASHBOARD
-  Private page for staff: orders, table reservations, and site
-  settings (business info, offer caption, UPI details).
-  NOT linked from the public site navigation — bookmark this URL.
-
-  SETUP (one-time, in Firebase Console):
-  1. Authentication > Sign-in method > enable Email/Password.
-  2. Authentication > Users > Add user — this is the staff login.
-     (Add a separate user per staff member / rider if you like —
-     rider.html uses the same login system.)
-  3. Firestore Database > Rules — see RESERVATIONS-SETUP.md / README
-     for the exact rules to paste in.
-  4. Fill FIREBASE_CONFIG below with the SAME values as index.html.
-  5. First time you sign in, go to the Settings tab and fill in your
-     real business info + UPI ID — this feeds index.html and menu.html.
-  ============================================================ -->
-
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#8f1d2c"><title>Bon Amigos • Super Admin</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
-  :root{
-    --ink:#241A16; --ivory:#FBF7F1; --paper:#F3ECE2;
-    --wine:#7A1F2B; --wine-deep:#5A1620; --gold:#B98A3B;
-    --olive:#5F6B47; --line:rgba(36,26,22,0.12);
-    --font-display:"Fraunces",Georgia,serif; --font-body:"Manrope",-apple-system,sans-serif;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:var(--font-body);color:var(--ink);background:var(--paper);}
-  h1,h2{font-family:var(--font-display);font-weight:600;margin:0;}
-  button{font-family:inherit;cursor:pointer;border:none;background:none;}
-  input,textarea{font-family:inherit;}
-
-  /* ---- login ---- */
-  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-  .login-card{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:36px 30px;width:100%;max-width:360px;}
-  .login-card h1{font-size:1.5rem;margin-bottom:6px;}
-  .login-card p{color:#6c5d54;font-size:0.9rem;margin:0 0 24px;}
-  .field{margin-bottom:16px;}
-  .field label{display:block;font-size:0.82rem;font-weight:700;margin-bottom:6px;}
-  .field input,.field textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:6px;font-size:0.95rem;background:#fff;}
-  .field textarea{resize:vertical;min-height:70px;}
-  .field input:focus,.field textarea:focus{outline:none;border-color:var(--wine);}
-  .field .hint{font-size:0.76rem;color:#8C8074;margin-top:5px;}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;font-size:0.92rem;font-weight:600;border-radius:6px;width:100%;background:var(--wine);color:#fff;}
-  .btn:hover{background:var(--wine-deep);}
-  .btn[disabled]{opacity:0.6;}
-  .btn-sm{width:auto;padding:7px 14px;font-size:0.8rem;border-radius:5px;}
-  .btn-outline-sm{width:auto;padding:6px 12px;font-size:0.78rem;border-radius:5px;border:1.5px solid var(--line);color:var(--ink);}
-  .btn-outline-sm:hover{border-color:var(--wine);color:var(--wine);}
-  .login-error{color:var(--wine-deep);font-size:0.85rem;margin-top:14px;display:none;}
-  .login-error.show{display:block;}
-  .save-msg{font-size:0.85rem;color:var(--olive);margin-top:12px;display:none;}
-  .save-msg.show{display:block;}
-
-  /* ---- dashboard shell ---- */
-  .dash{display:none;min-height:100vh;}
-  .dash.open{display:block;}
-  .topbar{background:var(--ink);color:var(--ivory);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
-  .topbar .logo{font-family:var(--font-display);font-size:1.15rem;}
-  .topbar .logo span{color:var(--gold);font-family:var(--font-body);font-size:0.75rem;display:block;margin-top:2px;}
-  #logoutBtn{color:#D8CEC2;font-size:0.85rem;}
-  #logoutBtn:hover{color:#fff;}
-
-  .tabbar{max-width:1100px;margin:0 auto;padding:16px 20px 0;display:flex;gap:6px;flex-wrap:wrap;}
-  .tabbar button{padding:10px 18px;font-size:0.88rem;font-weight:700;border-radius:6px 6px 0 0;color:#6c5d54;border-bottom:3px solid transparent;}
-  .tabbar button.active{color:var(--wine);border-color:var(--wine);}
-
-  .tab-panel{display:none;}
-  .tab-panel.active{display:block;}
-
-  .toolbar{max-width:1100px;margin:0 auto;padding:16px 20px 0;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;}
-  .filters{display:flex;flex-wrap:wrap;gap:8px;}
-  .filters button{padding:7px 14px;font-size:0.8rem;font-weight:600;border-radius:20px;border:1.5px solid var(--line);color:#6c5d54;background:var(--ivory);}
-  .filters button.active{background:var(--wine);border-color:var(--wine);color:#fff;}
-  .search-box input{padding:8px 14px;border:1.5px solid var(--line);border-radius:20px;font-size:0.85rem;width:200px;background:var(--ivory);}
-  .search-box input:focus{outline:none;border-color:var(--wine);}
-
-  .content{max-width:1100px;margin:0 auto;padding:20px;}
-  .empty-state{text-align:center;padding:60px 20px;color:#8C8074;}
-  .empty-state h2{font-size:1.1rem;margin-bottom:6px;color:var(--ink);}
-  .loading{text-align:center;padding:60px 20px;color:#8C8074;}
-
-  .card-grid{display:grid;gap:12px;}
-
-  /* ---- reservation card ---- */
-  .res-card{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:16px 18px;display:grid;gap:10px;grid-template-columns:1fr;}
-  @media(min-width:800px){ .res-card{grid-template-columns:1.4fr 1fr 1fr 0.8fr auto;align-items:center;gap:16px;} }
-  .res-name{font-weight:700;font-size:1rem;}
-  .res-sub{font-size:0.82rem;color:#6c5d54;margin-top:2px;}
-  .res-meta{font-size:0.88rem;}
-  .res-meta .lbl{color:#8C8074;font-size:0.75rem;display:block;}
-  .res-notes{font-size:0.82rem;color:#6c5d54;font-style:italic;}
-  .res-actions{display:flex;gap:8px;flex-wrap:wrap;}
-
-  /* ---- order card ---- */
-  .order-card{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:18px 20px;}
-  .order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-  .order-name{font-weight:700;font-size:1.02rem;}
-  .order-sub{font-size:0.82rem;color:#6c5d54;margin-top:2px;}
-  .order-total{font-family:var(--font-display);font-size:1.2rem;color:var(--wine);}
-  .order-items{font-size:0.86rem;color:#4a3f38;background:var(--paper);border-radius:6px;padding:10px 14px;margin-bottom:10px;}
-  .order-address{font-size:0.85rem;color:#6c5d54;margin-bottom:10px;}
-  .order-address a{color:var(--wine);font-weight:700;}
-  .order-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
-  .pill{display:inline-block;padding:4px 11px;border-radius:20px;font-size:0.74rem;font-weight:700;text-transform:capitalize;}
-  .pill.pending{background:#F3E3C8;color:#8A6417;}
-  .pill.confirmed{background:#DCE6D3;color:#4B5636;}
-  .pill.out_for_delivery{background:#D9E4EE;color:#2E4C6D;}
-  .pill.delivered{background:#DCE6D3;color:#4B5636;}
-  .pill.cancelled{background:#EBD3D3;color:#7A1F2B;}
-  .pill.cod{background:#EDE7DE;color:#5c4f47;}
-  .pill.upi{background:#E9E1F2;color:#5B3A85;}
-  .pill.pending_verification{background:#F3E3C8;color:#8A6417;}
-  .pill.paid{background:#DCE6D3;color:#4B5636;}
-  .order-actions{display:flex;gap:8px;flex-wrap:wrap;}
-
-  /* ---- settings ---- */
-  .settings-form{max-width:640px;background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:26px 28px;}
-  .settings-form h3{font-size:1.05rem;margin:24px 0 14px;}
-  .settings-form h3:first-child{margin-top:0;}
-  .settings-grid{display:grid;gap:14px;grid-template-columns:1fr;}
-  @media(min-width:640px){ .settings-grid.two-col{grid-template-columns:1fr 1fr;} }
-</style>
-</head>
+:root{--brand:#8f1d2c;--brand2:#b52b3c;--ink:#241716;--muted:#766966;--bg:#f6f3ef;--card:#fff;--line:#eadfd7;--ok:#19734a;--warn:#a66a00;--danger:#b42318;--shadow:0 10px 35px rgba(46,28,22,.08)}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}.layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{position:sticky;top:0;height:100vh;background:#241716;color:#fff;padding:18px 14px;display:flex;flex-direction:column}.logo{display:flex;gap:11px;align-items:center;padding:10px 8px 22px}.logoMark{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#c63b4d,#7a1625);display:grid;place-items:center;font-weight:900;font-size:20px}.logo b{font-size:17px}.logo small{display:block;color:#cbbfbb;margin-top:2px}.nav{display:grid;gap:5px}.nav button{border:0;background:transparent;color:#d8cfcc;text-align:left;padding:12px 13px;border-radius:11px;font-weight:700}.nav button:hover,.nav button.active{background:#ffffff14;color:#fff}.sideBottom{margin-top:auto;color:#a99d99;font-size:12px;padding:10px}.main{min-width:0}.top{height:74px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:20}.top h1{font-size:20px;margin:0}.top .sub{font-size:12px;color:var(--muted)}.topActions{display:flex;gap:8px;align-items:center}.content{padding:22px;max-width:1600px;margin:auto}.hero{background:linear-gradient(120deg,#7e1727,#b52b3c);color:#fff;border-radius:22px;padding:24px;box-shadow:var(--shadow);display:flex;justify-content:space-between;gap:18px;align-items:center}.hero h2{margin:0 0 6px;font-size:27px}.hero p{margin:0;color:#f5dfe1}.grid{display:grid;gap:14px}.stats{grid-template-columns:repeat(6,minmax(130px,1fr));margin:16px 0}.stat{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:15px;box-shadow:var(--shadow)}.stat .ico{font-size:21px}.stat span{display:block;color:var(--muted);font-size:12px;margin-top:7px}.stat b{display:block;font-size:27px;margin-top:3px}.section{display:none}.section.active{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}.sectionTitle{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}.sectionTitle h2{margin:0;font-size:20px}.sectionTitle p{margin:4px 0 0;color:var(--muted);font-size:13px}.btn{border:0;border-radius:10px;padding:10px 13px;font-weight:800}.primary{background:var(--brand);color:#fff}.dark{background:#241716;color:#fff}.light{background:#eee7e1;color:#342622}.danger{background:var(--danger);color:#fff}.success{background:#e7f5ed;color:var(--ok)}.warning{background:#fff4db;color:var(--warn)}.outline{background:#fff;border:1px solid var(--line);color:var(--ink)}.actions{display:flex;flex-wrap:wrap;gap:7px}.form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.form .wide{grid-column:1/-1}input,select,textarea{width:100%;border:1px solid #ddd0c8;border-radius:10px;padding:11px 12px;background:#fff;color:var(--ink);outline:none}input:focus,select:focus,textarea:focus{border-color:#bd6672;box-shadow:0 0 0 3px #8f1d2c12}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:13px}.toolbar input{max-width:330px}.list{display:grid;gap:9px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:13px;background:#fff}.rowMain{min-width:0}.rowTitle{font-weight:850}.muted{color:var(--muted);font-size:13px}.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#eee7e1;font-size:11px;font-weight:850;text-transform:capitalize}.pill.ok{background:#e7f5ed;color:var(--ok)}.pill.warn{background:#fff4db;color:var(--warn)}.pill.danger{background:#fde9e7;color:var(--danger)}.pill.blue{background:#e8f0ff;color:#365c9a}.tableGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}.tableCard{border:2px solid var(--line);border-radius:16px;padding:15px;background:#fff}.tableCard.free{border-color:#5aa875}.tableCard.reserved{border-color:#c38a2c}.tableCard.occupied{border-color:#c33a32}.tableCard.cleaning{border-color:#6976a8}.tableCard.blocked{border-color:#555}.tableNo{font-size:20px;font-weight:900}.divider{height:1px;background:var(--line);margin:18px 0}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.miniGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.mini{padding:13px;border:1px solid var(--line);border-radius:13px}.mini b{font-size:20px;display:block}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed #d8c9c0;border-radius:14px}.login{min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at top,#f4dce0,#f6f3ef 50%)}.loginCard{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:23px;padding:26px;box-shadow:0 20px 60px #4c211812}.loginLogo{width:58px;height:58px;border-radius:17px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:900;font-size:25px;margin-bottom:14px}.login h1{margin:0 0 6px}.login p{color:var(--muted)}.mobileMenu{display:none}.badgeLive{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#d9f6e6}.dot{width:7px;height:7px;border-radius:50%;background:#47cf83}.orderCard{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fff}.orderHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.orderMeta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.metaBox{background:#f8f5f2;border-radius:10px;padding:9px}.metaBox small{display:block;color:var(--muted);font-size:10px}.metaBox b{font-size:13px}.items{font-size:12px;color:#5c504b;line-height:1.6}.kpi{font-size:11px;color:var(--muted)}@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:1fr}.form{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.layout{display:block}.side{position:fixed;left:0;top:0;width:270px;transform:translateX(-105%);transition:.2s;z-index:50;box-shadow:20px 0 50px #0005}.side.open{transform:none}.mobileMenu{display:inline-flex}.top{padding:0 12px}.content{padding:12px}.hero{padding:18px}.hero h2{font-size:22px}.stats{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:1fr}.orderMeta{grid-template-columns:repeat(2,1fr)}.row{align-items:flex-start;flex-direction:column}.row>.actions{width:100%}.row>.actions select{flex:1}.topActions .adminEmail{display:none}.miniGrid{grid-template-columns:1fr 1fr}}
+</style></head>
 <body>
-
+<div id="login" class="login"><div class="loginCard"><div class="loginLogo">BA</div><h1>Bon Amigos Admin</h1><p>Secure restaurant control center</p><form id="loginForm" class="form"><input class="wide" id="email" type="email" placeholder="Admin email" required><input class="wide" id="password" type="password" placeholder="Password" required><button class="btn primary wide">Sign in to Dashboard</button></form><p id="loginErr" class="muted"></p></div></div>
+<div id="shell" class="layout hidden">
+<aside id="side" class="side"><div class="logo"><div class="logoMark">BA</div><div><b>Bon Amigos</b><small>Super Control</small></div></div><nav class="nav" id="nav"><button data-section="dashboard">📊 Dashboard</button><button data-section="orders">🛵 Orders</button><button data-section="bookings">📅 Reservations</button><button data-section="tables">🪑 Tables</button><button data-section="products">🍽️ Products</button><button data-section="captains">👨‍🍳 Captains</button><button data-section="riders">🛵 Riders</button><button data-section="payments">💳 Payments</button><button data-section="settings">⚙️ Settings</button></nav><div class="sideBottom"><span class="badgeLive"><span class="dot"></span> Realtime connected</span><br>Admin controls are protected by Firebase Authentication + RTDB rules.</div></aside>
+<main class="main"><header class="top"><div style="display:flex;align-items:center;gap:10px"><button class="btn light mobileMenu" id="menu">☰</button><div><h1 id="pageTitle">Dashboard</h1><div class="sub" id="adminEmail"></div></div></div><div class="topActions"><button class="btn outline" id="refresh">↻ Refresh</button><button class="btn dark" id="logout">Logout</button></div></header>
+<div class="content">
+<section id="dashboard" class="section active"><div class="hero"><div><h2>Good day, Admin 👋</h2><p>Control orders, tables, team, menu and payments from one place.</p></div><div class="actions"><button class="btn light" onclick="go('orders')">View Orders</button><button class="btn dark" onclick="go('products')">Manage Menu</button></div></div><div class="grid stats"><div class="stat"><div class="ico">🛵</div><span>Total Orders</span><b id="sOrders">0</b></div><div class="stat"><div class="ico">⏳</div><span>Pending Orders</span><b id="sPendingOrders">0</b></div><div class="stat"><div class="ico">₹</div><span>Today Sales</span><b id="sSales">₹0</b></div><div class="stat"><div class="ico">📅</div><span>Today's Reservations</span><b id="sBookings">0</b></div><div class="stat"><div class="ico">🪑</div><span>Free Tables</span><b id="sFree">0</b></div><div class="stat"><div class="ico">👥</div><span>Active Staff</span><b id="sStaff">0</b></div></div><div class="two"><div class="card"><div class="sectionTitle"><div><h2>Recent Orders</h2><p>Latest customer orders and payment state</p></div><button class="btn light" onclick="go('orders')">All orders</button></div><div id="dashOrders" class="list"></div></div><div class="card"><div class="sectionTitle"><div><h2>Live Operations</h2><p>Riders, tables and reservations</p></div></div><div class="miniGrid"><div class="mini"><span class="kpi">ONLINE RIDERS</span><b id="kOnline">0</b></div><div class="mini"><span class="kpi">OCCUPIED TABLES</span><b id="kOccupied">0</b></div><div class="mini"><span class="kpi">PENDING BOOKINGS</span><b id="kBookings">0</b></div></div><div class="divider"></div><div id="liveSummary"></div></div></div></section>
+<section id="orders" class="section"><div class="card"><div class="sectionTitle"><div><h2>Order Control Center</h2><p>Customer details, payment, rider assignment and live location.</p></div><button class="btn light" onclick="load()">↻ Sync</button></div><div class="toolbar"><input id="orderSearch" placeholder="Search order, customer, phone..." oninput="renderOrders()"><select id="orderFilter" onchange="renderOrders()"><option value="all">All status</option><option>pending</option><option>confirmed</option><option>assigned</option><option>preparing</option><option>out_for_delivery</option><option>delivered</option><option>cancelled</option></select><select id="paymentFilter" onchange="renderOrders()"><option value="all">All payments</option><option>pending</option><option>paid</option></select></div><div id="orderList" class="list"></div></div></section>
+<section id="bookings" class="section"><div class="card"><div class="sectionTitle"><div><h2>Reservation Control</h2><p>Confirm, cancel and assign tables.</p></div></div><div id="bookingList" class="list"></div></div></section>
+<section id="tables" class="section"><div class="card"><div class="sectionTitle"><div><h2>Table Control</h2><p>Realtime free, reserved, occupied, cleaning and blocked status.</p></div></div><div id="tableGrid" class="tableGrid"></div><div class="divider"></div><form id="tableForm" class="form"><input id="tn" type="number" placeholder="Table number" required><input id="ts" type="number" placeholder="Seats" min="1" required><input id="tsec" placeholder="Section: Main / Family / Outdoor"><button class="btn primary">+ Add Table</button></form></div></section>
+<section id="products" class="section"><div class="card"><div class="sectionTitle"><div><h2>Products & Menu</h2><p>Add, disable, price and payment settings per product.</p></div></div><form id="productForm" class="form"><input id="pn" placeholder="Product name" required><input id="pp" type="number" min="0" placeholder="Price" required><input id="pc" placeholder="Category"><textarea id="pd" class="wide" placeholder="Description"></textarea><input id="pimg" class="wide" placeholder="Public image URL (optional)"><input id="pupi" class="wide" placeholder="Product UPI ID (optional)"><button class="btn primary wide">+ Add Product</button></form><div class="divider"></div><div class="toolbar"><input id="productSearch" placeholder="Search menu..." oninput="renderProducts()"></div><div id="productList" class="list"></div></div></section>
+<section id="captains" class="section"><div class="card"><div class="sectionTitle"><div><h2>Captain Management</h2><p>Create and enable/disable captain accounts.</p></div></div><form id="captainForm" class="form"><input id="cn" placeholder="Captain name" required><input id="ce" type="email" placeholder="Captain email" required><input id="cp" type="password" minlength="6" placeholder="Temporary password" required><button class="btn primary">+ Create Captain</button></form><div class="divider"></div><div id="captainList" class="list"></div></div></section>
+<section id="riders" class="section"><div class="card"><div class="sectionTitle"><div><h2>Rider Management</h2><p>Monitor active riders and live location.</p></div></div><form id="riderForm" class="form"><input id="rn" placeholder="Rider name" required><input id="re" type="email" placeholder="Rider email" required><input id="rp" type="password" minlength="6" placeholder="Temporary password" required><button class="btn primary">+ Create Rider</button></form><div class="divider"></div><div id="riderList" class="list"></div></div></section>
+<section id="payments" class="section"><div class="two"><div class="card"><div class="sectionTitle"><div><h2>Payment Control</h2><p>UPI, COD and Razorpay overview.</p></div></div><div class="miniGrid"><div class="mini"><span class="kpi">PAID</span><b id="payPaid">0</b></div><div class="mini"><span class="kpi">PENDING</span><b id="payPending">0</b></div><div class="mini"><span class="kpi">TODAY</span><b id="payToday">₹0</b></div></div><div class="divider"></div><div id="paymentSummary"></div></div><div class="card"><div class="sectionTitle"><div><h2>Payment Settings</h2><p>Quick controls are also available in Settings.</p></div><button class="btn primary" onclick="go('settings')">Open Settings</button></div><div id="paymentSettingsView"></div></div></div></section>
+<section id="settings" class="section"><div class="card"><div class="sectionTitle"><div><h2>Restaurant & Super Settings</h2><p>Business profile, ordering, UPI, COD and Razorpay.</p></div></div><form id="settingsForm" class="form"><input id="setName" placeholder="Business name"><input id="setPhone" placeholder="Phone"><textarea id="setAddress" class="wide" placeholder="Full address"></textarea><input id="setMaps" class="wide" placeholder="Google Maps URL"><input id="setLogo" class="wide" placeholder="Logo image URL"><div class="wide divider"></div><h3 class="wide">UPI Payment</h3><input id="setUpiId" placeholder="Default UPI ID e.g. bonamigos@upi"><input id="setUpiName" placeholder="UPI display name"><label><input id="setCod" type="checkbox" checked style="width:auto;margin-right:6px"> Allow COD</label><div class="wide divider"></div><h3 class="wide">Razorpay</h3><label><input id="setRazorpay" type="checkbox" style="width:auto;margin-right:6px"> Enable Razorpay</label><input id="setRazorpayKey" class="wide" placeholder="Razorpay Key ID"><p class="muted wide">Client-side Razorpay checkout is optional. Never place a secret key in this page. Signature verification should be performed on a secure server endpoint.</p><button class="btn primary wide">Save All Settings</button></form></div></section>
+</div></main></div>
 <script>
-/* Match this to CONFIG.businessName in index.html / menu.html */
-const BUSINESS_NAME = "Bon Amigos";
-
-/* REPLACE — same values as FIREBASE_CONFIG in index.html / menu.html */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",
-  authDomain: "restro-56bc7.firebaseapp.com",
-  databaseURL: "https://restro-56bc7-default-rtdb.firebaseio.com",
-  projectId: "restro-56bc7",
-  storageBucket: "restro-56bc7.firebasestorage.app",
-  messagingSenderId: "636167397540",
-  appId: "1:636167397540:web:cfc9d31275fc8832b9c631",
-  measurementId: "G-X3QF67PKXS"
-};
-firebase.initializeApp(FIREBASE_CONFIG);
-const auth = firebase.auth();
-const db = firebase.firestore();
-</script>
-
-<!-- ================= LOGIN ================= -->
-<div class="login-screen" id="loginScreen">
-  <div class="login-card">
-    <h1>Staff Login</h1>
-    <p id="loginSub">Sign in to manage orders, reservations and settings.</p>
-    <form id="loginForm">
-      <div class="field">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" required autocomplete="username">
-      </div>
-      <div class="field">
-        <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" required autocomplete="current-password">
-      </div>
-      <button type="submit" class="btn" id="loginBtn">Sign In</button>
-      <p class="login-error" id="loginError"></p>
-    </form>
-  </div>
-</div>
-
-<!-- ================= DASHBOARD ================= -->
-<div class="dash" id="dash">
-  <div class="topbar">
-    <div class="logo">Bon Amigos<span>Admin Dashboard</span></div>
-    <button id="logoutBtn">Sign Out</button>
-  </div>
-
-  <div class="tabbar" id="tabbar">
-    <button data-tab="orders" class="active">Orders</button>
-    <button data-tab="reservations">Reservations</button>
-    <button data-tab="settings">Settings</button>
-  </div>
-
-  <!-- ---- ORDERS TAB ---- -->
-  <div class="tab-panel active" id="panel-orders">
-    <div class="toolbar">
-      <div class="filters" id="orderFilters">
-        <button data-filter="all" class="active">All</button>
-        <button data-filter="pending">Pending</button>
-        <button data-filter="confirmed">Confirmed</button>
-        <button data-filter="out_for_delivery">Out for Delivery</button>
-        <button data-filter="delivered">Delivered</button>
-        <button data-filter="cancelled">Cancelled</button>
-      </div>
-      <div class="search-box"><input type="text" id="orderSearch" placeholder="Search name or phone…"></div>
-    </div>
-    <div class="content">
-      <div class="loading" id="ordersLoading">Loading orders…</div>
-      <div class="card-grid" id="ordersGrid" style="display:none;"></div>
-      <div class="empty-state" id="ordersEmpty" style="display:none;">
-        <h2>No orders here</h2>
-        <p>Try a different filter or check back once orders come in.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---- RESERVATIONS TAB ---- -->
-  <div class="tab-panel" id="panel-reservations">
-    <div class="toolbar">
-      <div class="filters" id="resFilters">
-        <button data-filter="all" class="active">All</button>
-        <button data-filter="pending">Pending</button>
-        <button data-filter="confirmed">Confirmed</button>
-        <button data-filter="cancelled">Cancelled</button>
-      </div>
-      <div class="search-box"><input type="text" id="resSearch" placeholder="Search name or phone…"></div>
-    </div>
-    <div class="content">
-      <div class="loading" id="resLoading">Loading reservations…</div>
-      <div class="card-grid" id="resGrid" style="display:none;"></div>
-      <div class="empty-state" id="resEmpty" style="display:none;">
-        <h2>No reservations here</h2>
-        <p>Try a different filter or check back once bookings come in.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---- SETTINGS TAB ---- -->
-  <div class="tab-panel" id="panel-settings">
-    <div class="content">
-      <form class="settings-form" id="settingsForm">
-        <h3>Business Info</h3>
-        <div class="settings-grid two-col">
-          <div class="field"><label>Business Name</label><input id="sBusinessName"></div>
-          <div class="field"><label>Phone</label><input id="sPhone" placeholder="+91XXXXXXXXXX"></div>
-        </div>
-        <div class="settings-grid two-col">
-          <div class="field"><label>WhatsApp Number</label><input id="sWhatsapp" placeholder="91XXXXXXXXXX (no + or spaces)"></div>
-          <div class="field"><label>Hours</label><input id="sHours" placeholder="12:00 PM – 11:00 PM, all days"></div>
-        </div>
-        <div class="field"><label>Address</label><textarea id="sAddress"></textarea></div>
-        <div class="field"><label>Google Maps Link</label><input id="sMapsUrl" placeholder="https://maps.google.com/?q=..."></div>
-
-        <h3>Offer / Announcement Caption</h3>
-        <div class="field">
-          <label>Banner Caption</label>
-          <input id="sOfferCaption" placeholder="e.g. Flat 20% off on all Pizzas this weekend!">
-          <p class="hint">Shown as a gold banner at the top of the homepage and menu page. Leave blank to hide it.</p>
-        </div>
-
-        <h3>UPI Payment</h3>
-        <div class="settings-grid two-col">
-          <div class="field"><label>UPI ID</label><input id="sUpiId" placeholder="yourname@upi"></div>
-          <div class="field"><label>UPI QR Image URL</label><input id="sUpiQrUrl" placeholder="https://…/qr.png"></div>
-        </div>
-        <p class="hint" style="margin-top:-6px;margin-bottom:14px;">
-          No file upload here — host your QR image anywhere (e.g. a Google Drive/Imgur public link) and paste the URL.
-          Leave the QR URL blank to show the UPI ID only.
-        </p>
-
-        <button type="submit" class="btn" id="settingsSaveBtn" style="width:auto;">Save Settings</button>
-        <p class="save-msg" id="settingsSaveMsg">✓ Saved — changes are live on the site now.</p>
-      </form>
-    </div>
-  </div>
-</div>
-
-<script>
-/* ================= AUTH ================= */
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("loginEmail").value.trim();
-  const pass  = document.getElementById("loginPassword").value;
-  const btn   = document.getElementById("loginBtn");
-  const err   = document.getElementById("loginError");
-  err.classList.remove("show");
-  btn.disabled = true; btn.textContent = "Signing in…";
-  try{
-    await auth.signInWithEmailAndPassword(email, pass);
-  }catch(e){
-    err.textContent = "Incorrect email or password.";
-    err.classList.add("show");
-    btn.disabled = false; btn.textContent = "Sign In";
-  }
-});
-document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
-
-let unsubOrders = null, unsubRes = null;
-
-auth.onAuthStateChanged((user) => {
-  if(user){
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("dash").classList.add("open");
-    subscribeToOrders();
-    subscribeToReservations();
-    loadSettings();
-  }else{
-    document.getElementById("loginScreen").style.display = "flex";
-    document.getElementById("dash").classList.remove("open");
-    document.getElementById("loginBtn").disabled = false;
-    document.getElementById("loginBtn").textContent = "Sign In";
-    if(unsubOrders) unsubOrders();
-    if(unsubRes) unsubRes();
-  }
-});
-
-/* ================= TABS ================= */
-document.getElementById("tabbar").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-tab]");
-  if(!btn) return;
-  document.querySelectorAll("#tabbar button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  document.getElementById("panel-"+btn.dataset.tab).classList.add("active");
-});
-
-function escapeHtml(str){
-  const div = document.createElement("div");
-  div.textContent = str || "";
-  return div.innerHTML;
-}
-
-/* ================= ORDERS ================= */
-let allOrders = [];
-let orderFilter = "all";
-let orderSearch = "";
-
-function subscribeToOrders(){
-  document.getElementById("ordersLoading").style.display = "";
-  unsubOrders = db.collection("orders").orderBy("createdAt","desc").onSnapshot((snap) => {
-    allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderOrders();
-  }, (err) => {
-    console.error("Failed to load orders:", err);
-    document.getElementById("ordersLoading").textContent = "Couldn't load orders. Check Firestore rules and your connection.";
-  });
-}
-
-document.getElementById("orderFilters").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-filter]");
-  if(!btn) return;
-  document.querySelectorAll("#orderFilters button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  orderFilter = btn.dataset.filter;
-  renderOrders();
-});
-document.getElementById("orderSearch").addEventListener("input", (e) => {
-  orderSearch = e.target.value.trim().toLowerCase();
-  renderOrders();
-});
-
-async function updateOrderStatus(id, orderStatus){
-  try{ await db.collection("orders").doc(id).update({ orderStatus }); }
-  catch(e){ console.error(e); alert("Couldn't update order status."); }
-}
-async function markOrderPaid(id){
-  try{ await db.collection("orders").doc(id).update({ paymentStatus: "paid" }); }
-  catch(e){ console.error(e); alert("Couldn't update payment status."); }
-}
-
-function renderOrders(){
-  document.getElementById("ordersLoading").style.display = "none";
-  let list = allOrders;
-  if(orderFilter !== "all") list = list.filter(o => (o.orderStatus||"pending") === orderFilter);
-  if(orderSearch){
-    list = list.filter(o => (o.name||"").toLowerCase().includes(orderSearch) || (o.phone||"").includes(orderSearch));
-  }
-  const grid = document.getElementById("ordersGrid");
-  const empty = document.getElementById("ordersEmpty");
-  if(!list.length){ grid.style.display="none"; empty.style.display=""; return; }
-  empty.style.display = "none"; grid.style.display = "grid";
-
-  grid.innerHTML = list.map(o => {
-    const status = o.orderStatus || "pending";
-    const payStatus = o.paymentStatus || "cod";
-    const itemsList = (o.items||[]).map(l => `${l.qty}x ${escapeHtml(l.name)}`).join(", ");
-    const mapsHref = o.location ? `https://maps.google.com/?q=${o.location.lat},${o.location.lng}` : null;
-    const waHref = `https://wa.me/91${o.phone}?text=${encodeURIComponent(`Hello ${o.name}, this is ${BUSINESS_NAME} regarding your order.`)}`;
-
-    return `
-      <div class="order-card">
-        <div class="order-top">
-          <div>
-            <div class="order-name">${escapeHtml(o.name)}</div>
-            <div class="order-sub">${escapeHtml(o.phone)}${o.riderName ? " · Rider: "+escapeHtml(o.riderName) : ""}</div>
-          </div>
-          <div class="order-total">₹${o.subtotal}</div>
-        </div>
-        <div class="order-items">${itemsList || "—"}</div>
-        <div class="order-address">
-          📍 ${escapeHtml(o.address)}
-          ${mapsHref ? ` · <a href="${mapsHref}" target="_blank" rel="noopener">Open in Maps</a>` : ""}
-        </div>
-        <div class="order-badges">
-          <span class="pill ${status}">${status.replace(/_/g," ")}</span>
-          <span class="pill ${o.paymentMethod}">${o.paymentMethod === "upi" ? "UPI" : "Cash on Delivery"}</span>
-          ${o.paymentMethod === "upi" ? `<span class="pill ${payStatus}">${payStatus.replace(/_/g," ")}</span>` : ""}
-        </div>
-        <div class="order-actions">
-          ${status === "pending" ? `<button class="btn-sm btn" onclick="updateOrderStatus('${o.id}','confirmed')">Confirm</button>` : ""}
-          ${o.paymentMethod === "upi" && payStatus !== "paid" ? `<button class="btn-outline-sm" onclick="markOrderPaid('${o.id}')">Mark Paid</button>` : ""}
-          ${!["delivered","cancelled"].includes(status) ? `<button class="btn-outline-sm" onclick="updateOrderStatus('${o.id}','cancelled')">Cancel</button>` : ""}
-          <a class="btn-outline-sm" href="${waHref}" target="_blank" rel="noopener">WhatsApp</a>
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-/* ================= RESERVATIONS ================= */
-let allReservations = [];
-let resFilter = "all";
-let resSearch = "";
-
-function subscribeToReservations(){
-  document.getElementById("resLoading").style.display = "";
-  unsubRes = db.collection("reservations").orderBy("createdAt","desc").onSnapshot((snap) => {
-    allReservations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderReservations();
-  }, (err) => {
-    console.error("Failed to load reservations:", err);
-    document.getElementById("resLoading").textContent = "Couldn't load reservations. Check Firestore rules and your connection.";
-  });
-}
-
-document.getElementById("resFilters").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-filter]");
-  if(!btn) return;
-  document.querySelectorAll("#resFilters button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  resFilter = btn.dataset.filter;
-  renderReservations();
-});
-document.getElementById("resSearch").addEventListener("input", (e) => {
-  resSearch = e.target.value.trim().toLowerCase();
-  renderReservations();
-});
-
-async function updateResStatus(id, status){
-  try{ await db.collection("reservations").doc(id).update({ status }); }
-  catch(e){ console.error(e); alert("Couldn't update status."); }
-}
-
-function renderReservations(){
-  document.getElementById("resLoading").style.display = "none";
-  let list = allReservations;
-  if(resFilter !== "all") list = list.filter(r => (r.status||"pending") === resFilter);
-  if(resSearch){
-    list = list.filter(r => (r.name||"").toLowerCase().includes(resSearch) || (r.phone||"").includes(resSearch));
-  }
-  const grid = document.getElementById("resGrid");
-  const empty = document.getElementById("resEmpty");
-  if(!list.length){ grid.style.display="none"; empty.style.display=""; return; }
-  empty.style.display = "none"; grid.style.display = "grid";
-
-  grid.innerHTML = list.map(r => {
-    const dateLabel = r.date ? new Date(r.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
-    let timeLabel = r.time || "—";
-    if(r.time){
-      const [h,m] = r.time.split(":");
-      timeLabel = new Date(2000,0,1,h,m).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true});
-    }
-    const status = r.status || "pending";
-    const waHref = `https://wa.me/91${r.phone}?text=${encodeURIComponent(`Hello ${r.name}, this is ${BUSINESS_NAME} confirming your table for ${dateLabel} at ${timeLabel}.`)}`;
-    return `
-      <div class="res-card">
-        <div>
-          <div class="res-name">${escapeHtml(r.name)}</div>
-          <div class="res-sub">${escapeHtml(r.phone)}</div>
-        </div>
-        <div class="res-meta"><span class="lbl">Date & Time</span>${dateLabel} · ${timeLabel}</div>
-        <div class="res-meta"><span class="lbl">Guests</span>${r.guests||"—"}</div>
-        <div>
-          <span class="pill ${status}">${status}</span>
-          ${r.notes ? `<div class="res-notes">"${escapeHtml(r.notes)}"</div>` : ""}
-        </div>
-        <div class="res-actions">
-          ${status !== "confirmed" ? `<button class="btn-sm btn" onclick="updateResStatus('${r.id}','confirmed')">Confirm</button>` : ""}
-          ${status !== "cancelled" ? `<button class="btn-outline-sm" onclick="updateResStatus('${r.id}','cancelled')">Cancel</button>` : ""}
-          <a class="btn-outline-sm" href="${waHref}" target="_blank" rel="noopener">WhatsApp</a>
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
-/* ================= SETTINGS ================= */
-async function loadSettings(){
-  try{
-    const doc = await db.collection("settings").doc("site").get();
-    const s = doc.exists ? doc.data() : {};
-    document.getElementById("sBusinessName").value = s.businessName || BUSINESS_NAME;
-    document.getElementById("sPhone").value = s.phone || "";
-    document.getElementById("sWhatsapp").value = s.whatsapp || "";
-    document.getElementById("sHours").value = s.hours || "";
-    document.getElementById("sAddress").value = s.address || "";
-    document.getElementById("sMapsUrl").value = s.mapsUrl || "";
-    document.getElementById("sOfferCaption").value = s.offerCaption || "";
-    document.getElementById("sUpiId").value = s.upiId || "";
-    document.getElementById("sUpiQrUrl").value = s.upiQrUrl || "";
-  }catch(e){
-    console.error("Failed to load settings:", e);
-  }
-}
-
-document.getElementById("settingsForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = document.getElementById("settingsSaveBtn");
-  const msg = document.getElementById("settingsSaveMsg");
-  btn.disabled = true; btn.textContent = "Saving…"; msg.classList.remove("show");
-
-  const data = {
-    businessName: document.getElementById("sBusinessName").value.trim(),
-    phone: document.getElementById("sPhone").value.trim(),
-    whatsapp: document.getElementById("sWhatsapp").value.trim(),
-    hours: document.getElementById("sHours").value.trim(),
-    address: document.getElementById("sAddress").value.trim(),
-    mapsUrl: document.getElementById("sMapsUrl").value.trim(),
-    offerCaption: document.getElementById("sOfferCaption").value.trim(),
-    upiId: document.getElementById("sUpiId").value.trim(),
-    upiQrUrl: document.getElementById("sUpiQrUrl").value.trim()
-  };
-
-  try{
-    await db.collection("settings").doc("site").set(data, { merge: true });
-    msg.classList.add("show");
-  }catch(e){
-    console.error("Failed to save settings:", e);
-    alert("Couldn't save settings. Please try again.");
-  }finally{
-    btn.disabled = false; btn.textContent = "Save Settings";
-  }
-});
-</script>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-
-</body>
-</html>
+const firebaseConfig={apiKey:"AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",databaseURL:"https://restro-56bc7-default-rtdb.firebaseio.com",authDomain:"restro-56bc7.firebaseapp.com",projectId:"restro-56bc7",storageBucket:"restro-56bc7.firebasestorage.app",messagingSenderId:"636167397540",appId:"1:636167397540:web:cfc9d31275fc8832b9c631",measurementId:"G-X3QF67PKXS"};
+firebase.initializeApp(firebaseConfig);const db=firebase.database(),auth=firebase.auth(),$=id=>document.getElementById(id);
+let data={tables:{},reservations:{},products:{},staff:{},orders:{},settings:{},riderLocations:{},customerLocations:{}};let listenersStarted=false;
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const arr=x=>Object.entries(x||{}).map(([id,v])=>({id,...(v||{})}));
+const adminCheck=async uid=>{const s=await db.ref('admins/'+uid).once('value');const v=s.val();return v===true || (v&&v.isAdmin===true)};
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const today=()=>new Date().toISOString().slice(0,10);
+const statusPill=s=>{s=s||'pending';let c=['delivered','confirmed','paid'].includes(s)?'ok':['cancelled'].includes(s)?'danger':['pending','preparing'].includes(s)?'warn':'blue';return `<span class="pill ${c}">${esc(s.replaceAll('_',' '))}</span>`};
+function go(id){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));const el=$(id);if(el)el.classList.add('active');document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.section===id));const titles={dashboard:'Dashboard',orders:'Order Control Center',bookings:'Reservations',tables:'Tables',products:'Products & Menu',captains:'Captains',riders:'Riders',payments:'Payments',settings:'Settings'};$('pageTitle').textContent=titles[id]||'Dashboard';location.hash=id;$('side').classList.remove('open');if(id==='orders')renderOrders();if(id==='products')renderProducts()}
+$('nav').addEventListener('click',e=>{const b=e.target.closest('button[data-section]');if(b)go(b.dataset.section)});$('menu').onclick=()=>$('side').classList.toggle('open');window.go=go;
+async function load(){try{const keys=Object.keys(data);const ss=await Promise.all(keys.map(k=>db.ref(k).once('value')));keys.forEach((k,i)=>data[k]=ss[i].val()||{});renderAll()}catch(e){alert('Load failed: '+e.message)}}
+function startRealtime(){if(listenersStarted)return;listenersStarted=true;['orders','tables','reservations','staff','riderLocations','customerLocations','products','settings'].forEach(k=>db.ref(k).on('value',s=>{data[k]=s.val()||{};renderAll()}))}
+function renderAll(){renderStats();renderOrders();renderBookings();renderTables();renderProducts();renderStaff();renderPayments();renderSettings();renderDashboard()}
+function renderStats(){const orders=arr(data.orders),tables=arr(data.tables),bookings=arr(data.reservations),staff=arr(data.staff);$('sOrders').textContent=orders.length;$('sPendingOrders').textContent=orders.filter(o=>['pending','confirmed','preparing'].includes(o.status||'pending')).length;const sales=orders.filter(o=>o.status==='delivered'&&sameDay(o.createdAt)).reduce((a,o)=>a+Number(o.total||0),0);$('sSales').textContent=money(sales);$('sBookings').textContent=bookings.filter(x=>x.date===today()&&x.status!=='cancelled').length;$('sFree').textContent=tables.filter(x=>(x.status||'free')==='free').length;$('sStaff').textContent=staff.filter(x=>x.active!==false).length;$('kOccupied').textContent=tables.filter(x=>x.status==='occupied').length;$('kBookings').textContent=bookings.filter(x=>x.status==='pending').length;$('kOnline').textContent=staff.filter(x=>x.role==='rider'&&x.active!==false&&online(x.id)).length}
+function sameDay(t){if(!t)return false;const d=new Date(Number(t));return d.toISOString().slice(0,10)===today()}
+function online(id){const l=(data.riderLocations||{})[id];return !!(l&&Date.now()-Number(l.updatedAt||0)<90000)}
+function renderDashboard(){const orders=arr(data.orders).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0).slice?.()||0);const recent=orders.slice(0,6);$('dashOrders').innerHTML=recent.map(o=>`<div class="row"><div class="rowMain"><div class="rowTitle">#${esc(o.orderNo||o.id.slice(0,8))} · ${money(o.total)}</div><div class="muted">${esc(o.name)} · ${esc(o.phone)} · ${statusPill(o.status)}</div></div><button class="btn light" onclick="go('orders')">Manage</button></div>`).join('')||'<div class="empty">No orders yet.</div>';$('liveSummary').innerHTML=`<div class="row"><div><b>Riders online</b><div class="muted">Green riders can receive orders.</div></div><span class="pill ok">${$('kOnline').textContent} online</span></div><div class="row"><div><b>Tables occupied</b><div class="muted">Live dining floor status.</div></div><span class="pill blue">${$('kOccupied').textContent}</span></div><div class="row"><div><b>Pending reservations</b><div class="muted">Need confirmation or table assignment.</div></div><span class="pill warn">${$('kBookings').textContent}</span></div>`}
+function renderOrders(){const q=($('orderSearch')?.value||'').toLowerCase().trim(),f=$('orderFilter')?.value||'all',pf=$('paymentFilter')?.value||'all';let orders=arr(data.orders).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));orders=orders.filter(o=>(f==='all'||(o.status||'pending')===f)&&(pf==='all'||(o.paymentStatus||'pending')===pf)&&(!q||`${o.orderNo} ${o.name} ${o.phone} ${o.address}`.toLowerCase().includes(q)));const riders=arr(data.staff).filter(x=>x.role==='rider'&&x.active!==false);$('orderList').innerHTML=orders.map(o=>{const loc=(data.customerLocations||{})[o.id]||{};const lat=Number.isFinite(Number(loc.latitude))?Number(loc.latitude):Number(o.latitude),lng=Number.isFinite(Number(loc.longitude))?Number(loc.longitude):Number(o.longitude);const map=Number.isFinite(lat)&&Number.isFinite(lng)?`<a class="btn light" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat+','+lng)}">📍 Customer Map</a>`:'';const opts=riders.map(r=>`<option value="${r.id}" ${o.riderId===r.id?'selected':''}>${online(r.id)?'🟢':'⚪'} ${esc(r.name||r.email)}</option>`).join('');const items=typeof o.items==='object'?Object.values(o.items).map(i=>esc(i.name||i.productName||'Item')+' × '+esc(i.qty||i.quantity||1)).join(' · '):esc(o.items||'');return `<div class="orderCard"><div class="orderHead"><div><div class="rowTitle">#${esc(o.orderNo||o.id.slice(0,8))} · ${money(o.total)}</div><div class="muted">${esc(o.name)} · ${esc(o.phone)}</div></div><div>${statusPill(o.status)} ${statusPill(o.paymentStatus||'pending')}</div></div><div class="orderMeta"><div class="metaBox"><small>ADDRESS</small><b>${esc(o.address)}</b></div><div class="metaBox"><small>PAYMENT</small><b>${esc((o.paymentMethod||'cod').toUpperCase())}</b></div><div class="metaBox"><small>RIDER</small><b>${esc(riders.find(r=>r.id===o.riderId)?.name||'Not assigned')}</b></div><div class="metaBox"><small>LOCATION</small><b>${loc.updatedAt?'Live GPS':'Order GPS'}</b></div></div><div class="items"><b>Items:</b> ${items||'Not available'}</div><div class="actions" style="margin-top:12px">${map}<select id="r_${o.id}" style="max-width:230px"><option value="">Assign rider</option>${opts}</select><button class="btn primary" onclick="assignRider('${o.id}')">Send Rider</button><button class="btn light" onclick="cycleOrder('${o.id}','confirmed')">Confirm</button><button class="btn light" onclick="cycleOrder('${o.id}','preparing')">Preparing</button><button class="btn light" onclick="cycleOrder('${o.id}','out_for_delivery')">Out for delivery</button><button class="btn success" onclick="cycleOrder('${o.id}','delivered')">Delivered</button><button class="btn warning" onclick="confirmPayment('${o.id}')">Mark Paid</button><button class="btn danger" onclick="cycleOrder('${o.id}','cancelled')">Cancel</button></div></div>`}).join('')||'<div class="empty">No orders match your filters.</div>'}
+function renderBookings(){const tables=arr(data.tables),b=arr(data.reservations).sort((a,c)=>Number(c.createdAt||0)-Number(a.createdAt||0));$('bookingList').innerHTML=b.map(x=>`<div class="row"><div class="rowMain"><div class="rowTitle">${esc(x.name)} · ${esc(x.guests)} guests</div><div class="muted">${esc(x.phone)} · ${esc(x.date)} ${esc(x.time)} · ${statusPill(x.status||'pending')} ${x.tableId?' · Table '+esc(tables.find(t=>t.id===x.tableId)?.number||''):''}</div></div><div class="actions"><button class="btn primary" onclick="updateBooking('${x.id}','confirmed')">Confirm</button><button class="btn light" onclick="assignTable('${x.id}')">Assign Table</button><button class="btn danger" onclick="updateBooking('${x.id}','cancelled')">Cancel</button></div></div>`).join('')||'<div class="empty">No reservations.</div>'}
+function renderTables(){const t=arr(data.tables).sort((a,b)=>Number(a.number)-Number(b.number));$('tableGrid').innerHTML=t.map(x=>`<div class="tableCard ${esc(x.status||'free')}"><div class="tableNo">Table ${esc(x.number)}</div><div class="muted">${esc(x.seats)} seats · ${esc(x.section||'Main')}</div><p>${statusPill(x.status||'free')}</p><div class="actions"><button class="btn light" onclick="setTable('${x.id}','free')">Free</button><button class="btn dark" onclick="setTable('${x.id}','occupied')">Occupied</button><button class="btn light" onclick="setTable('${x.id}','reserved')">Reserved</button><button class="btn light" onclick="setTable('${x.id}','cleaning')">Cleaning</button><button class="btn danger" onclick="setTable('${x.id}','blocked')">Block</button><button class="btn outline" onclick="deleteTable('${x.id}')">Delete</button></div></div>`).join('')||'<div class="empty">No tables added.</div>'}
+function renderProducts(){const q=($('productSearch')?.value||'').toLowerCase();const p=arr(data.products).filter(x=>`${x.name} ${x.category}`.toLowerCase().includes(q)).sort((a,b)=>String(a.name).localeCompare(String(b.name)));$('productList').innerHTML=p.map(x=>`<div class="row"><div class="rowMain">${x.image?`<img src="${esc(x.image)}" style="width:58px;height:44px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:8px">`:''}<span class="rowTitle">${esc(x.name)}</span><div class="muted">${money(x.price)} · ${esc(x.category||'Uncategorized')} · ${x.upiId?'UPI '+esc(x.upiId)+' · ':''}${x.active===false?'Disabled':'Active'}</div></div><div class="actions"><button class="btn light" onclick="toggleProduct('${x.id}',${x.active!==false})">${x.active===false?'Enable':'Disable'}</button><button class="btn danger" onclick="deleteProduct('${x.id}')">Delete</button></div></div>`).join('')||'<div class="empty">No products.</div>'}
+function renderStaff(){const staff=arr(data.staff),caps=staff.filter(x=>x.role==='captain'),riders=staff.filter(x=>x.role==='rider');$('captainList').innerHTML=caps.map(x=>`<div class="row"><div><div class="rowTitle">${esc(x.name||'Captain')}</div><div class="muted">${esc(x.email||'')} · ${x.active!==false?'Active':'Disabled'}</div></div><button class="btn light" onclick="toggleStaff('${x.id}',${x.active!==false})">${x.active!==false?'Disable':'Enable'}</button></div>`).join('')||'<div class="empty">No captains.</div>';$('riderList').innerHTML=riders.map(x=>`<div class="row"><div><div class="rowTitle">${esc(x.name||'Rider')} ${online(x.id)?'<span class="pill ok">Online</span>':'<span class="pill">Offline</span>'}</div><div class="muted">${esc(x.email||'')} · ${x.active!==false?'Active':'Disabled'}${x.id&&data.riderLocations[x.id]?.updatedAt?' · GPS '+Math.round((Date.now()-Number(data.riderLocations[x.id].updatedAt))/1000)+'s ago':''}</div></div><div class="actions"><button class="btn light" onclick="toggleStaff('${x.id}',${x.active!==false})">${x.active!==false?'Disable':'Enable'}</button></div></div>`).join('')||'<div class="empty">No riders.</div>'}
+function renderPayments(){const orders=arr(data.orders),paid=orders.filter(o=>o.paymentStatus==='paid'),pending=orders.filter(o=>(o.paymentStatus||'pending')!=='paid');$('payPaid').textContent=paid.length;$('payPending').textContent=pending.length;$('payToday').textContent=money(paid.filter(o=>sameDay(o.createdAt)).reduce((a,o)=>a+Number(o.total||0),0));const methods={cod:0,upi:0,razorpay:0};orders.forEach(o=>methods[o.paymentMethod||'cod']=(methods[o.paymentMethod||'cod']||0)+1);$('paymentSummary').innerHTML=`<div class="row"><b>COD orders</b><span class="pill">${methods.cod||0}</span></div><div class="row"><b>UPI orders</b><span class="pill">${methods.upi||0}</span></div><div class="row"><b>Razorpay orders</b><span class="pill">${methods.razorpay||0}</span></div>`;const pay=data.settings.payment||{};$('paymentSettingsView').innerHTML=`<div class="row"><div><b>Default UPI</b><div class="muted">${esc(pay.upiId||'Not configured')}</div></div>${pay.upiId?'<span class="pill ok">Ready</span>':'<span class="pill warn">Setup needed</span>'}</div><div class="row"><div><b>Cash on Delivery</b></div><span class="pill ${pay.codEnabled!==false?'ok':'danger'}">${pay.codEnabled!==false?'Enabled':'Disabled'}</span></div><div class="row"><div><b>Razorpay</b></div><span class="pill ${pay.razorpayEnabled?'ok':'danger'}">${pay.razorpayEnabled?'Enabled':'Disabled'}</span></div>`}
+function renderSettings(){const s=data.settings.restaurant||{},p=data.settings.payment||{};$('setName').value=s.businessName||'';$('setPhone').value=s.phone||'';$('setAddress').value=s.address||'';$('setMaps').value=s.mapsUrl||'';$('setLogo').value=s.logoUrl||'';$('setUpiId').value=p.upiId||'';$('setUpiName').value=p.upiName||s.businessName||'';$('setCod').checked=p.codEnabled!==false;$('setRazorpay').checked=p.razorpayEnabled===true;$('setRazorpayKey').value=p.razorpayKeyId||''}
+async function createStaff(role,name,email,password){const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+encodeURIComponent(firebaseConfig.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});const j=await r.json();if(!r.ok)throw Error(j.error?.message||'Could not create account');await db.ref('staff/'+j.localId).set({name,email,role,active:true,createdAt:Date.now()})}
+$('loginForm').onsubmit=async e=>{e.preventDefault();$('loginErr').textContent='';try{await auth.signInWithEmailAndPassword($('email').value,$('password').value)}catch(x){$('loginErr').textContent=x.message}};$('logout').onclick=()=>auth.signOut();$('refresh').onclick=load;
+auth.onAuthStateChanged(async u=>{if(!u){$('login').classList.remove('hidden');$('shell').classList.add('hidden');return}try{if(!(await adminCheck(u.uid))){$('loginErr').textContent='This Firebase account is not an authorized admin.';await auth.signOut();return}$('login').classList.add('hidden');$('shell').classList.remove('hidden');$('adminEmail').textContent=u.email||u.uid;startRealtime();await load();go(location.hash.slice(1)||'dashboard')}catch(e){$('loginErr').textContent=e.message}});
+$('tableForm').onsubmit=async e=>{e.preventDefault();await db.ref('tables/t_'+Date.now()).set({number:Number($('tn').value),seats:Number($('ts').value),section:$('tsec').value.trim(),status:'free',createdAt:Date.now()});e.target.reset();load()};window.setTable=async(id,status)=>{await db.ref('tables/'+id).update({status,updatedAt:Date.now()});};window.deleteTable=async id=>{if(confirm('Delete this table?'))await db.ref('tables/'+id).remove()};
+window.updateBooking=async(id,status)=>{await db.ref('reservations/'+id).update({status,updatedAt:Date.now(),updatedBy:auth.currentUser.uid})};window.assignTable=async id=>{const free=arr(data.tables).filter(t=>(t.status||'free')==='free');if(!free.length)return alert('No free tables.');const n=prompt('Available table numbers: '+free.map(t=>t.number).join(', '));const t=free.find(x=>String(x.number)===String(n));if(!t)return;await db.ref('reservations/'+id).update({tableId:t.id,status:'confirmed',updatedAt:Date.now()});await db.ref('tables/'+t.id).update({status:'reserved',currentBookingId:id,updatedAt:Date.now()})};
+$('productForm').onsubmit=async e=>{e.preventDefault();await db.ref('products/p_'+Date.now()).set({name:$('pn').value.trim(),price:Number($('pp').value),category:$('pc').value.trim(),description:$('pd').value.trim(),image:$('pimg').value.trim(),upiId:$('pupi').value.trim(),active:true,createdAt:Date.now()});e.target.reset()};window.toggleProduct=async(id,a)=>db.ref('products/'+id).update({active:!a});window.deleteProduct=async id=>{if(confirm('Delete this product?'))await db.ref('products/'+id).remove()};
+async function make(role,ids){try{await createStaff(role,$(ids[0]).value.trim(),$(ids[1]).value.trim(),$(ids[2]).value);$(ids[3]).reset();alert(role+' created successfully.')}catch(e){alert(e.message)}};$('captainForm').onsubmit=e=>{e.preventDefault();make('captain',['cn','ce','cp','captainForm'])};$('riderForm').onsubmit=e=>{e.preventDefault();make('rider',['rn','re','rp','riderForm'])};window.toggleStaff=async(id,a)=>db.ref('staff/'+id).update({active:!a});
+window.assignRider=async id=>{const riderId=$('r_'+id)?.value;if(!riderId)return alert('Select a rider.');if(!online(riderId))return alert('Selected rider is offline. Choose a green online rider.');await db.ref('orders/'+id).update({riderId,status:'assigned',assignedAt:Date.now(),updatedAt:Date.now()})};window.confirmPayment=async id=>db.ref('orders/'+id).update({paymentStatus:'paid',paymentConfirmedAt:Date.now(),paymentConfirmedBy:auth.currentUser.uid,updatedAt:Date.now()});window.cycleOrder=async(id,status)=>{if(status==='cancelled'&&!confirm('Cancel this order?'))return;await db.ref('orders/'+id).update({status,updatedAt:Date.now(),...(status==='delivered'?{deliveredAt:Date.now()}:{}),...(status==='confirmed'?{confirmedAt:Date.now()}:{}),...(status==='preparing'?{preparingAt:Date.now()}:{}),...(status==='out_for_delivery'?{outForDeliveryAt:Date.now()}:{} )})};
+$('settingsForm').onsubmit=async e=>{e.preventDefault();await db.ref('settings/restaurant').update({businessName:$('setName').value.trim(),phone:$('setPhone').value.trim(),address:$('setAddress').value.trim(),mapsUrl:$('setMaps').value.trim(),logoUrl:$('setLogo').value.trim()});await db.ref('settings/payment').update({upiId:$('setUpiId').value.trim(),upiName:$('setUpiName').value.trim(),codEnabled:$('setCod').checked,razorpayEnabled:$('setRazorpay').checked,razorpayKeyId:$('setRazorpayKey').value.trim()});alert('All settings saved.')};
+window.addEventListener('hashchange',()=>{const id=location.hash.slice(1);if($(id))go(id)});
+</script></body></html>

@@ -48,7 +48,13 @@
         ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'captain' && root.child('staff').child(auth.uid).child('active').val() == true) || (root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && data.child('riderId').val() == auth.uid))",
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'captain' && root.child('staff').child(auth.uid).child('active').val() == true) || (root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && data.child('riderId').val() == auth.uid) || (!data.exists() && newData.child('status').val() == 'pending'))",
         ".validate": "newData.hasChildren(['orderNo','name','phone','address','latitude','longitude','items','total','paymentMethod','status','createdAt']) && newData.child('orderNo').isString() && newData.child('name').isString() && newData.child('phone').isString() && newData.child('address').isString() && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('items').exists() && newData.child('total').isNumber() && newData.child('total').val() >= 0 && newData.child('paymentMethod').isString() && newData.child('status').isString() && newData.child('createdAt').isNumber() && (newData.child('paymentMethod').val() == 'cod' || newData.child('paymentMethod').val() == 'upi' || newData.child('paymentMethod').val() == 'razorpay')"
-      }
+      },
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'captain' && root.child('staff').child(auth.uid).child('active').val() == true) || (root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && query.orderByChild == 'riderId' && query.equalTo == auth.uid))",
+      ".indexOn": [
+        "riderId",
+        "createdAt",
+        "status"
+      ]
     },
     "riderLocations": {
       "$uid": {
