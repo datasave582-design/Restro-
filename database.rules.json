@@ -5,30 +5,30 @@
     "admins": {
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
         ".validate": "(newData.isBoolean() && newData.val() == true) || (newData.hasChild('isAdmin') && newData.child('isAdmin').isBoolean())"
       }
     },
     "staff": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (auth.uid == $uid && data.child('role').val() == 'rider' && newData.child('role').val() == 'rider' && newData.child('active').val() == data.child('active').val()))",
-        ".validate": "newData.hasChildren(['role','active']) && (newData.child('role').val() == 'captain' || newData.child('role').val() == 'rider') && newData.child('active').isBoolean()"
+        ".validate": "newData.hasChildren(['role','active']) && (newData.child('role').val() == 'admin' || newData.child('role').val() == 'captain' || newData.child('role').val() == 'rider') && newData.child('active').isBoolean()"
       }
     },
     "settings": {
       ".read": true,
       "$id": {
         ".read": true,
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))"
       }
     },
     "products": {
       ".read": true,
       "$id": {
         ".read": true,
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
         ".validate": "newData.hasChildren(['name','price','active']) && newData.child('name').isString() && newData.child('price').isNumber() && newData.child('price').val() >= 0 && newData.child('active').isBoolean()"
       }
     },
@@ -45,7 +45,7 @@
       "$id": {
         ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'captain' && root.child('staff').child(auth.uid).child('active').val() == true) || data.child('customerUid').val() == auth.uid)",
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'captain' && root.child('staff').child(auth.uid).child('active').val() == true) || (!data.exists() && newData.child('status').val() == 'pending' && newData.child('customerUid').val() == auth.uid))",
-        ".validate": "newData.hasChildren(['name','phone','date','time','guests','status','createdAt','customerUid']) && newData.child('name').isString() && newData.child('phone').isString() && newData.child('date').isString() && newData.child('time').isString() && newData.child('guests').isNumber() && newData.child('guests').val() >= 1 && newData.child('guests').val() <= 50 && newData.child('status').isString() && newData.child('createdAt').isNumber() && newData.child('customerUid').isString()"
+        ".validate": "newData.hasChildren(['name','phone','date','time','guests','status','createdAt']) && newData.child('name').isString() && newData.child('phone').isString() && newData.child('date').isString() && newData.child('time').isString() && newData.child('guests').isNumber() && newData.child('guests').val() >= 1 && newData.child('guests').val() <= 50 && newData.child('status').isString() && newData.child('createdAt').isNumber() && ((!newData.child('source').exists() && newData.child('customerUid').isString()) || (newData.child('source').val() == 'captain' && (!newData.child('customerUid').exists() || newData.child('customerUid').isString())))"
       },
       ".indexOn": [
         "customerUid",
@@ -67,10 +67,10 @@
       }
     },
     "riderLocations": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
       "$uid": {
         ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || auth.uid == $uid)",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (auth.uid == $uid && root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && newData.child('dutyOn').val() == true))",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (auth.uid == $uid && root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && (!newData.exists() || newData.child('dutyOn').val() == true)))",
         ".validate": "newData.hasChildren(['latitude','longitude','updatedAt']) && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('updatedAt').isNumber()"
       }
     },
@@ -78,14 +78,14 @@
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || root.child('staff').child(auth.uid).child('role').val() == 'captain' || root.child('staff').child(auth.uid).child('role').val() == 'rider')",
       "$id": {
         ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || root.child('staff').child(auth.uid).child('role').val() == 'captain' || root.child('staff').child(auth.uid).child('role').val() == 'rider')",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))"
       }
     },
     "customerLocations": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
       "$orderId": {
         ".read": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'rider' && root.child('staff').child(auth.uid).child('active').val() == true && root.child('orders').child($orderId).child('riderId').val() == auth.uid))",
-        ".write": "auth != null && ((root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true) || (root.child('orders').child($orderId).child('customerUid').val() == auth.uid && root.child('orders').child($orderId).child('locationToken').val() == newData.child('token').val()))",
+        ".write": "auth != null && ((root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true)) || (root.child('orders').child($orderId).child('customerUid').val() == auth.uid && root.child('orders').child($orderId).child('locationToken').val() == newData.child('token').val()))",
         ".validate": "newData.hasChildren(['latitude','longitude','updatedAt','token']) && newData.child('latitude').isNumber() && newData.child('longitude').isNumber() && newData.child('updatedAt').isNumber() && newData.child('token').isString()"
       }
     },
@@ -102,8 +102,8 @@
     },
     "adminEmails": {
       "$uid": {
-        ".read": "auth != null && ((root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true) || auth.uid == $uid)",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true)",
+        ".read": "auth != null && ((root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true)) || auth.uid == $uid)",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() == true || root.child('admins').child(auth.uid).child('isAdmin').val() == true || root.child('adminEmails').child(auth.uid).val() == true || (root.child('staff').child(auth.uid).child('role').val() == 'admin' && root.child('staff').child(auth.uid).child('active').val() == true))",
         ".validate": "newData.isBoolean()"
       }
     }
