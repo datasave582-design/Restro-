@@ -72,3 +72,10 @@ Important
 - Do NOT create/use Firebase Storage for this package.
 - Public image URLs must be direct HTTPS image URLs.
 - GPS works only after browser permission and normally requires HTTPS.
+
+
+ADMIN/RULES COMPATIBILITY FIX
+- admins/{uid}=true supported.
+- admins/{uid}/isAdmin=true supported.
+- admin.html authorization supports both formats.
+- database.rules.json is the matching RTDB rules file.
