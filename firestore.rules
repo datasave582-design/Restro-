@@ -1,18 +1,99 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn(){ return request.auth != null; }
-    function admin(){ return signedIn() && root.child('admins').child(request.auth.uid).val() == true; }
-    function captain(){ return signedIn() && root.child('staff').child(request.auth.uid).child('role').val() == 'captain' && root.child('staff').child(request.auth.uid).child('active').val() == true; }
-    match /admins/{uid} { allow read: if signedIn() && (request.auth.uid == uid || admin()); allow write: if admin(); }
-    match /staff/{uid} { allow read: if admin() || (signedIn() && request.auth.uid == uid); allow write: if admin(); }
-    match /settings/{id} { allow read: if true; allow write: if admin(); }
-    match /tables/{id} { allow read: if admin() || captain(); allow create, delete: if admin(); allow update: if admin() || captain(); }
-    match /products/{id} { allow read: if true; allow create, update, delete: if admin(); }
-    match /reservations/{id} {
-      allow create: if request.resource.data.status == 'pending' && request.resource.data.name is string && request.resource.data.phone is string && request.resource.data.date is string && request.resource.data.time is string && request.resource.data.guests is number;
-      allow read: if admin() || captain();
-      allow update, delete: if admin() || captain();
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && root.child('admins').child(request.auth.uid).child('isAdmin').val() == true;
+    }
+
+    function isCaptain() {
+      return signedIn()
+        && root.child('staff').child(request.auth.uid).child('role').val() == 'captain'
+        && root.child('staff').child(request.auth.uid).child('active').val() == true;
+    }
+
+    function isRider() {
+      return signedIn()
+        && root.child('staff').child(request.auth.uid).child('role').val() == 'rider'
+        && root.child('staff').child(request.auth.uid).child('active').val() == true;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /staff/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /settings/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /tables/{tableId} {
+      allow read: if isAdmin() || isCaptain();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isCaptain();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /reservations/{reservationId} {
+      allow create: if isAdmin() || isCaptain() || (
+        request.resource.data.status == 'pending'
+        && request.resource.data.name is string
+        && request.resource.data.phone is string
+        && request.resource.data.date is string
+        && request.resource.data.time is string
+        && request.resource.data.guests is number
+      );
+      allow read: if isAdmin() || isCaptain();
+      allow update, delete: if isAdmin() || isCaptain();
+    }
+
+    match /orders/{orderId} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.phone is string
+        && request.resource.data.address is string
+        && request.resource.data.latitude is number
+        && request.resource.data.longitude is number
+        && request.resource.data.items is list
+        && request.resource.data.total is number
+        && request.resource.data.status == 'pending';
+
+      allow read: if isAdmin() || isCaptain() || (isRider() && resource.data.riderId == request.auth.uid);
+
+      allow update: if isAdmin() || isCaptain() || (isRider() && resource.data.riderId == request.auth.uid);
+
+      allow delete: if isAdmin();
+    }
+
+    match /riderLocations/{riderId} {
+      allow create, update: if isAdmin() || (isRider() && request.auth.uid == riderId);
+      allow read: if isAdmin() || (isRider() && request.auth.uid == riderId);
+      allow delete: if isAdmin() || (isRider() && request.auth.uid == riderId);
+    }
+
+    match /orderHistory/{historyId} {
+      allow read: if isAdmin() || isCaptain() || isRider();
+      allow create: if isAdmin() || isCaptain() || isRider();
+      allow update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

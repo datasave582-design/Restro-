@@ -464,10 +464,10 @@ const RESERVE_CONFIG = {
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;">
       <div style="max-width:480px;">
         <h2 style="font-size:1.6rem;">Ready to order or reserve a table?</h2>
-        <p style="color:#5c4f47;margin-top:8px;">Full online ordering and table booking flows are built in the next phase — for now, order and reserve directly on WhatsApp or by phone.</p>
+        <p style="color:#5c4f47;margin-top:8px;">Choose your favourites, add your delivery details and place an order directly from the website.</p>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;" id="reserve">
-        <a class="btn btn-primary" id="waOrder" href="#" target="_blank" rel="noopener">Order via WhatsApp</a>
+        <button class="btn btn-primary" id="openOrder" type="button">Order Online</button>
         <a class="btn btn-outline" id="waReserve" href="#" target="_blank" rel="noopener">Book via WhatsApp</a>
         <a class="btn btn-outline" id="callNow" href="tel:">Call Now</a>
       </div>
@@ -540,6 +540,28 @@ const RESERVE_CONFIG = {
     WhatsApp
   </a>
 </nav>
+
+<!-- ================= ONLINE ORDER MODAL ================= -->
+<div class="modal-overlay" id="orderOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="modal-close" id="orderClose" aria-label="Close">✕</button>
+    <div id="orderFormView">
+      <h2>Order Online</h2><p class="modal-sub">Delivery to your location</p>
+      <div id="cartItems" style="margin-bottom:14px"></div>
+      <form id="orderForm" novalidate>
+        <div class="form-field"><label>Full Name</label><input id="oName" required autocomplete="name"></div>
+        <div class="form-field"><label>Mobile Number</label><input id="oPhone" type="tel" required autocomplete="tel" placeholder="10-digit mobile number"></div>
+        <div class="form-field"><label>Delivery Address</label><textarea id="oAddress" required placeholder="House, street, area, city"></textarea></div>
+        <div style="display:flex;gap:8px;align-items:center;margin:8px 0"><button type="button" class="btn btn-outline" id="useGps">📍 Use My GPS</button><span id="gpsStatus" class="modal-sub">GPS not set</span></div>
+        <input type="hidden" id="oLat"><input type="hidden" id="oLng">
+        <div class="form-field"><label>GPS / Location Address (optional)</label><input id="oGpsAddress" placeholder="Detected location name"></div>
+        <div class="form-field"><label>Payment</label><select id="oPayment"><option value="cod">Cash on Delivery</option><option value="online">Online Payment</option></select></div>
+        <div id="orderError" class="error-msg"></div><button class="btn btn-primary" id="orderSubmit" type="submit">Place Order</button>
+      </form>
+    </div>
+    <div id="orderSuccess" style="display:none"><h2>Order Placed 🎉</h2><p id="orderSuccessText"></p><button class="btn btn-primary" id="orderDone">Done</button></div>
+  </div>
+</div>
 
 <!-- ================= RESERVATION MODAL ================= -->
 <div class="modal-overlay" id="reserveOverlay">
@@ -856,5 +878,49 @@ function showReservationSuccess(booking){
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
 
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}</script>
+
+<script>
+/* ================= ONLINE ORDERING ================= */
+let orderCart=[];
+const orderOverlay=document.getElementById('orderOverlay');
+const orderOpen=document.getElementById('openOrder');
+const orderClose=document.getElementById('orderClose');
+const orderDone=document.getElementById('orderDone');
+function renderOrderCart(){
+  const box=document.getElementById('cartItems');
+  if(!orderCart.length){box.innerHTML='<div class="modal-sub">Your cart is empty. Add items from the menu.</div>';return}
+  const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
+  box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><b>Total</b><b>₹${total}</b></div>`;
+}
+function addToOrder(name,price){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1});renderOrderCart();orderOverlay.classList.add('open');}
+window.addToOrder=addToOrder;
+if(orderOpen)orderOpen.onclick=()=>{renderOrderCart();orderOverlay.classList.add('open')};
+if(orderClose)orderClose.onclick=()=>orderOverlay.classList.remove('open');
+if(orderDone)orderDone.onclick=()=>orderOverlay.classList.remove('open');
+if(orderOverlay)orderOverlay.addEventListener('click',e=>{if(e.target===orderOverlay)orderOverlay.classList.remove('open')});
+document.getElementById('useGps').onclick=()=>{
+  const st=document.getElementById('gpsStatus');st.textContent='Getting location…';
+  if(!navigator.geolocation){st.textContent='GPS unavailable';return}
+  navigator.geolocation.getCurrentPosition(async p=>{
+    document.getElementById('oLat').value=p.coords.latitude;document.getElementById('oLng').value=p.coords.longitude;st.textContent='GPS captured ✓';
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.coords.latitude}&lon=${p.coords.longitude}`);const j=await r.json();if(j.display_name){document.getElementById('oGpsAddress').value=j.display_name;if(!document.getElementById('oAddress').value)document.getElementById('oAddress').value=j.display_name}}catch(e){}
+  },()=>{st.textContent='Please allow location permission'}, {enableHighAccuracy:true,timeout:10000,maximumAge:0});
+};
+document.getElementById('orderForm').onsubmit=async e=>{
+  e.preventDefault();const err=document.getElementById('orderError');err.classList.remove('show');
+  if(!orderCart.length){err.textContent='Please add at least one item.';err.classList.add('show');return}
+  const phone=document.getElementById('oPhone').value.replace(/\D/g,'');const lat=Number(document.getElementById('oLat').value),lng=Number(document.getElementById('oLng').value);
+  if(phone.length<10){err.textContent='Enter a valid mobile number.';err.classList.add('show');return}
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)){err.textContent='Please tap Use My GPS before placing the order.';err.classList.add('show');return}
+  const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
+  try{
+    const ref=db.collection('orders').doc();const orderNo='BA'+Date.now().toString().slice(-8);
+    const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
+    await ref.set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod:document.getElementById('oPayment').value,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
+    orderCart=[];
+  }catch(x){console.error(x);err.textContent='Order failed. Please try again.';err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
+};
+</script>
 </body>
 </html>
