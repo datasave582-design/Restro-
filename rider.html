@@ -1,1 +1,282 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#7a1f2b"><title>Bon Amigos • Rider Dashboard</title><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script><style>:root{--brand:#7a1f2b;--brand2:#b83b4b;--bg:#f7f3ee;--card:#fff;--ink:#241a16;--muted:#776b65;--line:#e7ddd4;--ok:#16834f}*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:linear-gradient(180deg,#fbf8f4,var(--bg));color:var(--ink)}.wrap{max-width:1180px;margin:auto;padding:16px}.top{background:linear-gradient(120deg,var(--brand),var(--brand2));color:#fff;border-radius:22px;padding:20px;display:flex;justify-content:space-between;align-items:center;gap:12px;box-shadow:0 14px 40px #4b1d2522}.brand{display:flex;gap:12px;align-items:center}.logo{width:48px;height:48px;border-radius:15px;background:#ffffff20;display:grid;place-items:center;font-weight:900;font-size:20px}.top h1{font-size:21px;margin:0}.top p{margin:4px 0 0;color:#f4dfe2;font-size:12px}button{font:inherit}.btn{border:0;border-radius:11px;padding:10px 13px;font-weight:800;cursor:pointer}.light{background:#fff;color:var(--ink)}.primary{background:var(--brand);color:#fff}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}.stat,.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 8px 28px #3b251a0a}.stat span{color:var(--muted);font-size:12px}.stat b{display:block;font-size:27px;margin-top:5px}.duty{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0;padding:15px;border:1px solid var(--line);border-radius:16px;background:#fff}.switch{width:54px;height:30px;border-radius:99px;border:0;background:#cfc7c1;position:relative;cursor:pointer}.switch i{position:absolute;width:24px;height:24px;top:3px;left:3px;border-radius:50%;background:#fff;transition:.2s}.switch.on{background:var(--ok)}.switch.on i{left:27px}.order{border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:10px;background:#fff}.head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#eee8e2;font-size:11px;font-weight:900;text-transform:uppercase}.pill.ok{background:#e6f6ed;color:var(--ok)}.details{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.box{background:#f8f5f2;border-radius:11px;padding:10px}.box small{display:block;color:var(--muted);font-size:10px}.items{font-size:12px;line-height:1.65;color:#5e524c}.total{font-size:16px;font-weight:900;border-top:1px solid var(--line);padding-top:9px;margin-top:8px;display:flex;justify-content:space-between}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.muted{color:var(--muted);font-size:13px}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:18px}.login .card{width:min(430px,100%)}input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:6px 0}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.details{grid-template-columns:repeat(2,1fr)}.head{flex-direction:column}.actions .btn{flex:1}}@media(max-width:500px){.wrap{padding:10px}.stat,.card,.order{padding:13px}}</style></head><body><div id="login" class="login"><div class="card"><div class="brand"><div class="logo" style="background:var(--brand);color:#fff">BA</div><div><h2 style="margin:0">Rider Login</h2><p class="muted">Bon Amigos delivery control</p></div></div><form id="loginForm"><input id="email" type="email" placeholder="Rider email" required><input id="password" type="password" placeholder="Password" required><button class="btn primary" style="width:100%;margin-top:8px">Login</button></form><p id="err" class="muted"></p></div></div><div id="app" class="wrap hidden"><div class="top"><div class="brand"><div class="logo">BA</div><div><h1>Rider Dashboard</h1><p id="who"></p></div></div><button id="logout" class="btn light">Logout</button></div><div class="duty"><div><b>Delivery Duty</b><div id="dutyText" class="muted">Turn duty ON to receive new orders.</div></div><button id="dutyBtn" class="switch" aria-label="Duty"><i></i></button></div><div class="grid"><div class="stat"><span>Active Orders</span><b id="assigned">0</b></div><div class="stat"><span>Out for Delivery</span><b id="out">0</b></div><div class="stat"><span>Delivered</span><b id="delivered">0</b></div><div class="stat"><span>Today's Orders</span><b id="today">0</b></div></div><section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><h2 style="margin:0">My Orders</h2><p class="muted" style="margin:4px 0">Customer, address, items, payment and delivery total</p></div><span id="gps" class="pill">GPS OFF</span></div><div id="orders"></div></section></div><script>const firebaseConfig={apiKey:"AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",databaseURL:"https://restro-56bc7-default-rtdb.firebaseio.com",authDomain:"restro-56bc7.firebaseapp.com",projectId:"restro-56bc7",storageBucket:"restro-56bc7.firebasestorage.app",messagingSenderId:"636167397540",appId:"1:636167397540:web:cfc9d31275fc8832b9c631",measurementId:"G-X3QF67PKXS"};firebase.initializeApp(firebaseConfig);const db=firebase.database(),auth=firebase.auth(),$=id=>document.getElementById(id);let uid=null,duty=false;const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));const sameDay=t=>{const d=new Date(Number(t||0)),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};function render(v){const arr=Object.entries(v||{}).map(([id,x])=>({id,...x})).filter(x=>x.riderId===uid).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));$('assigned').textContent=arr.filter(x=>!['delivered','cancelled'].includes(x.status)).length;$('out').textContent=arr.filter(x=>x.status==='out_for_delivery').length;$('delivered').textContent=arr.filter(x=>x.status==='delivered').length;$('today').textContent=arr.filter(x=>sameDay(x.createdAt)).length;$('orders').innerHTML=arr.map(o=>{const nav=Number.isFinite(Number(o.latitude))&&Number.isFinite(Number(o.longitude))?`<a class="btn light" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${o.latitude},${o.longitude}">📍 Navigate</a>`:'';const next=o.status==='assigned'?'accepted':o.status==='accepted'?'picked_up':o.status==='picked_up'?'out_for_delivery':o.status==='out_for_delivery'?'delivered':'';const items=typeof o.items==='object'?Object.values(o.items).map(i=>`${esc(i.name||i.productName||'Item')} × ${esc(i.qty||i.quantity||1)}`).join('<br>'):esc(o.items||'');return `<div class="order"><div class="head"><div><b>#${esc(o.orderNo||o.id.slice(0,8))}</b><div class="muted">${esc(o.name)} · ${esc(o.phone)}</div></div><span class="pill ok">${esc(o.status||'pending').replaceAll('_',' ')}</span></div><div class="details"><div class="box"><small>PAYMENT</small><b>${esc((o.paymentMethod||'cod').toUpperCase())}</b></div><div class="box"><small>PAYMENT STATUS</small><b>${esc(o.paymentStatus||'pending')}</b></div><div class="box"><small>DELIVERY</small><b>${Number(o.deliveryCharge||0)?'₹'+Number(o.deliveryCharge).toFixed(0):'FREE'}</b></div><div class="box"><small>TOTAL</small><b>₹${Number(o.total||0).toFixed(0)}</b></div></div><div class="items"><b>Items</b><br>${items||'Not available'}<div class="total"><span>Collect / Total</span><span>₹${Number(o.total||0).toFixed(0)}</span></div></div><p class="muted"><b>Address:</b> ${esc(o.address)}${o.gpsAddress?' · '+esc(o.gpsAddress):''}</p><div class="actions">${nav}<a class="btn light" href="tel:${encodeURIComponent(o.phone||'')}">📞 Call</a>${next?`<button class="btn primary" onclick="statusOrder('${o.id}','${next}')">${next.replaceAll('_',' ').toUpperCase()}</button>`:''}</div></div>`}).join('')||'<div class="muted" style="padding:25px;text-align:center">No orders assigned.</div>'}function listen(){db.ref('orders').on('value',s=>render(s.val()));db.ref('riderDuty/'+uid).on('value',s=>{duty=s.val()?.onDuty===true;updateDutyUI()})}function updateDutyUI(){$('dutyBtn').classList.toggle('on',duty);$('dutyText').textContent=duty?'Duty ON — you can receive delivery orders.':'Duty OFF — you will not receive new orders.'}window.statusOrder=async(id,status)=>{try{await db.ref('orders/'+id).update({status,updatedAt:Date.now(),...(status==='delivered'?{deliveredAt:Date.now()}: {})})}catch(e){alert('Could not update order: '+e.message)}};$('dutyBtn').onclick=async()=>{try{await db.ref('riderDuty/'+uid).set({onDuty:!duty,updatedAt:Date.now()})}catch(e){alert(e.message)}};$('loginForm').onsubmit=async e=>{e.preventDefault();$('err').textContent='';try{await auth.signInWithEmailAndPassword($('email').value.trim(),$('password').value)}catch(x){$('err').textContent=x.message}};$('logout').onclick=()=>auth.signOut();auth.onAuthStateChanged(async u=>{if(!u){uid=null;$('login').classList.remove('hidden');$('app').classList.add('hidden');return}const s=await db.ref('staff/'+u.uid).once('value'),v=s.val();if(!s.exists()||v.role!=='rider'||v.active===false){$('err').textContent='Rider access required';auth.signOut();return}uid=u.uid;$('who').textContent=v.name||u.email;$('login').classList.add('hidden');$('app').classList.remove('hidden');listen();if(navigator.geolocation)navigator.geolocation.watchPosition(p=>{db.ref('riderLocations/'+uid).set({latitude:p.coords.latitude,longitude:p.coords.longitude,updatedAt:Date.now(),online:true});$('gps').textContent='GPS ON'},()=>$('gps').textContent='GPS OFF',{enableHighAccuracy:true,maximumAge:15000,timeout:10000})});</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rider Dashboard | Bon Amigos</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!-- ============================================================
+  BON AMIGOS — RIDER DASHBOARD
+  For delivery riders: see confirmed orders ready for pickup,
+  claim one, then mark it delivered once dropped off.
+  NOT linked from public nav — share this URL with riders directly.
+
+  SETUP: same Firebase project as index.html/admin.html.
+  Create one Authentication > Users login per rider (Firebase
+  Console > Authentication > Users > Add user). Fill FIREBASE_CONFIG
+  below with the SAME values as the other pages.
+  ============================================================ -->
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --ink:#241A16; --ivory:#FBF7F1; --paper:#F3ECE2;
+    --wine:#7A1F2B; --wine-deep:#5A1620; --gold:#B98A3B;
+    --olive:#5F6B47; --line:rgba(36,26,22,0.12);
+    --font-display:"Fraunces",Georgia,serif; --font-body:"Manrope",-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--font-body);color:var(--ink);background:var(--paper);}
+  h1,h2{font-family:var(--font-display);font-weight:600;margin:0;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;}
+  input{font-family:inherit;}
+
+  .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:var(--ivory);border:1px solid var(--line);border-radius:8px;padding:36px 30px;width:100%;max-width:340px;}
+  .login-card h1{font-size:1.4rem;margin-bottom:6px;}
+  .login-card p{color:#6c5d54;font-size:0.9rem;margin:0 0 22px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:0.82rem;font-weight:700;margin-bottom:6px;}
+  .field input{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:6px;font-size:0.95rem;background:#fff;}
+  .field input:focus{outline:none;border-color:var(--wine);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;font-size:0.92rem;font-weight:600;border-radius:6px;width:100%;background:var(--wine);color:#fff;}
+  .btn:hover{background:var(--wine-deep);}
+  .btn-sm{width:auto;padding:8px 16px;font-size:0.82rem;border-radius:6px;background:var(--wine);color:#fff;font-weight:700;}
+  .btn-outline-sm{width:auto;padding:7px 14px;font-size:0.8rem;border-radius:6px;border:1.5px solid var(--line);color:var(--ink);font-weight:600;}
+  .btn-outline-sm:hover{border-color:var(--wine);color:var(--wine);}
+  .login-error{color:var(--wine-deep);font-size:0.85rem;margin-top:14px;display:none;}
+  .login-error.show{display:block;}
+
+  .dash{display:none;min-height:100vh;padding-bottom:40px;}
+  .dash.open{display:block;}
+  .topbar{background:var(--ink);color:var(--ivory);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar .logo{font-family:var(--font-display);font-size:1.1rem;}
+  .topbar .logo span{color:var(--gold);font-family:var(--font-body);font-size:0.72rem;display:block;margin-top:2px;}
+  #logoutBtn{color:#D8CEC2;font-size:0.85rem;}
+  #logoutBtn:hover{color:#fff;}
+
+  .tabbar{max-width:700px;margin:0 auto;padding:16px 16px 0;display:flex;gap:6px;}
+  .tabbar button{flex:1;padding:11px;font-size:0.86rem;font-weight:700;border-radius:8px;color:#6c5d54;background:var(--ivory);border:1.5px solid var(--line);}
+  .tabbar button.active{color:#fff;background:var(--wine);border-color:var(--wine);}
+
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .content{max-width:700px;margin:0 auto;padding:16px;}
+  .loading, .empty-state{text-align:center;padding:50px 20px;color:#8C8074;}
+  .empty-state h2{font-size:1.05rem;color:var(--ink);margin-bottom:6px;}
+
+  .order-card{background:var(--ivory);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:12px;}
+  .order-name{font-weight:700;font-size:1rem;}
+  .order-sub{font-size:0.82rem;color:#6c5d54;margin-top:2px;}
+  .order-items{font-size:0.86rem;color:#4a3f38;background:var(--paper);border-radius:6px;padding:10px 14px;margin:10px 0;}
+  .order-address{font-size:0.87rem;color:#4a3f38;margin-bottom:6px;}
+  .order-address a{color:var(--wine);font-weight:700;}
+  .pill{display:inline-block;padding:4px 11px;border-radius:20px;font-size:0.74rem;font-weight:700;}
+  .pill.cod{background:#EDE7DE;color:#5c4f47;}
+  .pill.upi{background:#E9E1F2;color:#5B3A85;}
+  .order-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .call-link{display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:700;color:var(--wine);}
+</style>
+</head>
+<body>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",
+  authDomain: "restro-56bc7.firebaseapp.com",
+  databaseURL: "https://restro-56bc7-default-rtdb.firebaseio.com",
+  projectId: "restro-56bc7",
+  storageBucket: "restro-56bc7.firebasestorage.app",
+  messagingSenderId: "636167397540",
+  appId: "1:636167397540:web:cfc9d31275fc8832b9c631",
+  measurementId: "G-X3QF67PKXS"
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.firestore();
+</script>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Rider Login</h1>
+    <p>Sign in to see orders ready for delivery.</p>
+    <form id="loginForm">
+      <div class="field"><label for="loginEmail">Email</label><input type="email" id="loginEmail" required autocomplete="username"></div>
+      <div class="field"><label for="loginPassword">Password</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
+      <button type="submit" class="btn" id="loginBtn">Sign In</button>
+      <p class="login-error" id="loginError"></p>
+    </form>
+  </div>
+</div>
+
+<div class="dash" id="dash">
+  <div class="topbar">
+    <div class="logo">Bon Amigos<span id="riderLabel">Rider</span></div>
+    <button id="logoutBtn">Sign Out</button>
+  </div>
+
+  <div class="tabbar" id="tabbar">
+    <button data-tab="available" class="active">Available</button>
+    <button data-tab="mine">My Deliveries</button>
+  </div>
+
+  <div class="tab-panel active" id="panel-available">
+    <div class="content">
+      <div class="loading" id="availLoading">Loading orders…</div>
+      <div id="availList"></div>
+      <div class="empty-state" id="availEmpty" style="display:none;">
+        <h2>No orders waiting</h2>
+        <p>Confirmed orders ready for pickup will show up here.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-mine">
+    <div class="content">
+      <div class="loading" id="mineLoading">Loading your deliveries…</div>
+      <div id="mineList"></div>
+      <div class="empty-state" id="mineEmpty" style="display:none;">
+        <h2>Nothing out with you right now</h2>
+        <p>Pick up an order from the Available tab to see it here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentUserEmail = null;
+let allOrders = [];
+let unsubOrders = null;
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  const pass  = document.getElementById("loginPassword").value;
+  const btn   = document.getElementById("loginBtn");
+  const err   = document.getElementById("loginError");
+  err.classList.remove("show");
+  btn.disabled = true; btn.textContent = "Signing in…";
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    err.textContent = "Incorrect email or password.";
+    err.classList.add("show");
+    btn.disabled = false; btn.textContent = "Sign In";
+  }
+});
+document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
+
+auth.onAuthStateChanged((user) => {
+  if(user){
+    currentUserEmail = user.email;
+    document.getElementById("riderLabel").textContent = user.email;
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("dash").classList.add("open");
+    subscribeToOrders();
+  }else{
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("dash").classList.remove("open");
+    document.getElementById("loginBtn").disabled = false;
+    document.getElementById("loginBtn").textContent = "Sign In";
+    if(unsubOrders) unsubOrders();
+  }
+});
+
+document.getElementById("tabbar").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if(!btn) return;
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("panel-"+btn.dataset.tab).classList.add("active");
+});
+
+function subscribeToOrders(){
+  document.getElementById("availLoading").style.display = "";
+  document.getElementById("mineLoading").style.display = "";
+  // Confirmed + out_for_delivery orders make up the rider's working set —
+  // filtered client-side into "available" vs "mine" below.
+  unsubOrders = db.collection("orders")
+    .where("orderStatus", "in", ["confirmed", "out_for_delivery"])
+    .onSnapshot((snap) => {
+      allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    }, (err) => {
+      console.error("Failed to load orders:", err);
+      document.getElementById("availLoading").textContent = "Couldn't load orders. Check Firestore rules and your connection.";
+      document.getElementById("mineLoading").textContent = "Couldn't load orders.";
+    });
+}
+
+async function pickUp(id){
+  try{
+    await db.collection("orders").doc(id).update({
+      orderStatus: "out_for_delivery",
+      riderName: currentUserEmail
+    });
+  }catch(e){ console.error(e); alert("Couldn't pick up this order."); }
+}
+async function markDelivered(id){
+  try{
+    await db.collection("orders").doc(id).update({ orderStatus: "delivered" });
+  }catch(e){ console.error(e); alert("Couldn't mark as delivered."); }
+}
+
+function escapeHtml(str){
+  const div = document.createElement("div");
+  div.textContent = str || "";
+  return div.innerHTML;
+}
+
+function orderCard(o, mode){
+  const itemsList = (o.items||[]).map(l => `${l.qty}x ${escapeHtml(l.name)}`).join(", ");
+  const mapsHref = o.location ? `https://maps.google.com/?q=${o.location.lat},${o.location.lng}` : null;
+  const action = mode === "available"
+    ? `<button class="btn-sm" onclick="pickUp('${o.id}')">Pick Up</button>`
+    : `<button class="btn-sm" onclick="markDelivered('${o.id}')">Mark Delivered</button>`;
+
+  return `
+    <div class="order-card">
+      <div class="order-name">${escapeHtml(o.name)}</div>
+      <div class="order-sub">₹${o.subtotal} · <span class="pill ${o.paymentMethod}">${o.paymentMethod === "upi" ? "UPI Paid" : "Collect Cash"}</span></div>
+      <div class="order-items">${itemsList || "—"}</div>
+      <div class="order-address">
+        📍 ${escapeHtml(o.address)}
+        ${mapsHref ? ` · <a href="${mapsHref}" target="_blank" rel="noopener">Open in Maps</a>` : ""}
+      </div>
+      <div class="order-actions">
+        ${action}
+        <a class="call-link" href="tel:${o.phone}">📞 Call Customer</a>
+      </div>
+    </div>
+  `;
+}
+
+function render(){
+  document.getElementById("availLoading").style.display = "none";
+  document.getElementById("mineLoading").style.display = "none";
+
+  const available = allOrders.filter(o => o.orderStatus === "confirmed");
+  const mine = allOrders.filter(o => o.orderStatus === "out_for_delivery" && o.riderName === currentUserEmail);
+
+  const availList = document.getElementById("availList");
+  const availEmpty = document.getElementById("availEmpty");
+  if(!available.length){ availList.innerHTML=""; availEmpty.style.display=""; }
+  else{ availEmpty.style.display="none"; availList.innerHTML = available.map(o => orderCard(o,"available")).join(""); }
+
+  const mineList = document.getElementById("mineList");
+  const mineEmpty = document.getElementById("mineEmpty");
+  if(!mine.length){ mineList.innerHTML=""; mineEmpty.style.display=""; }
+  else{ mineEmpty.style.display="none"; mineList.innerHTML = mine.map(o => orderCard(o,"mine")).join(""); }
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+
+</body>
+</html>
