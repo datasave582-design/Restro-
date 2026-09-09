@@ -307,28 +307,6 @@
 ============================================================================= -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
-<style id="premium-home-enhancements">
-body{background:radial-gradient(circle at 10% 0%,#fff 0,transparent 32%),var(--ivory)}
-header{box-shadow:0 8px 30px rgba(36,26,22,.06)}
-.logo{color:var(--wine)}
-.hero{background:linear-gradient(135deg,#fffaf4 0%,#f3e8da 100%);position:relative;overflow:hidden}
-.hero:after{content:"";position:absolute;inset:auto -80px -120px auto;width:320px;height:320px;border-radius:50%;background:rgba(185,138,59,.12);pointer-events:none}
-.hero-copy{position:relative;z-index:1}.hero-copy h1{font-size:clamp(2.7rem,6vw,4.8rem);letter-spacing:-.04em}
-.hero-media{box-shadow:-18px 0 50px rgba(36,26,22,.12)}.hero-media img{filter:saturate(1.05)}
-.btn{border-radius:12px;box-shadow:0 7px 18px rgba(36,26,22,.08)}
-.btn-primary{background:linear-gradient(135deg,var(--wine),var(--wine-deep))}
-.trust-strip{background:linear-gradient(135deg,#241a16,#4b2420)}
-.review-card,.dish-card{border-radius:16px;box-shadow:0 10px 30px rgba(36,26,22,.07);transition:transform .2s ease,box-shadow .2s ease}.review-card:hover,.dish-card:hover{transform:translateY(-4px);box-shadow:0 16px 38px rgba(36,26,22,.12)}
-.dish-img{height:175px}.dish-card{flex-basis:255px}
-.love-item{background:linear-gradient(180deg,#fff,#fbf7f1);border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:0 8px 25px rgba(36,26,22,.05)}
-#order{background:linear-gradient(135deg,#f5eadc,#ead9c4)}
-footer{background:linear-gradient(135deg,#241a16,#3c211d)}
-.wa-float{box-shadow:0 10px 28px rgba(37,211,102,.3);transition:transform .2s}.wa-float:hover{transform:scale(1.07)}
-@media(max-width:899px){.hero-copy{padding:46px 22px 38px}.hero-media{min-height:330px;box-shadow:none}}
-</style>
-
-<style>@media(max-width:700px){.quick-features .wrap{grid-template-columns:repeat(2,1fr)!important}.quick-features .wrap>div{padding:13px!important;font-size:13px}}@media(max-width:420px){.quick-features .wrap{gap:8px}.quick-features .wrap>div{font-size:12px}}</style>
 </head>
 <body>
 
@@ -388,8 +366,8 @@ db.ref('settings/restaurant').on('value', snap => {
   const fm=document.getElementById('footMaps'); if(fm && CONFIG.mapsUrl) fm.href=CONFIG.mapsUrl;
 });
 
-let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:''};
-db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); });
+let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:''};let DELIVERY_SETTINGS={enabled:true,fee:30,freeThreshold:300};
+db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); });db.ref('settings/delivery').on('value', snap=>{ DELIVERY_SETTINGS=Object.assign(DELIVERY_SETTINGS,snap.val()||{}); refreshPaymentUI(); renderOrderCart(); });
 function cartEffectiveUpi(){
   const ids=[...new Set(orderCart.map(x=>String(x.upiId||'').trim()).filter(Boolean))];
   return ids.length===1?ids[0]:(PAYMENT_SETTINGS.upiId||'');
@@ -489,13 +467,6 @@ const RESERVE_CONFIG = {
       </div>
     </div>
   </div>
-
-  <section class="quick-features" style="padding:28px 0 10px;background:var(--ivory)"><div class="wrap" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-    <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px"><b>🍕 Fresh & Hot</b><div class="modal-sub">Made to order</div></div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px"><b>🛵 Easy Delivery</b><div class="modal-sub">Fast local delivery</div></div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px"><b>💳 Easy Payments</b><div class="modal-sub">COD • UPI • Online</div></div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px"><b>💬 WhatsApp Support</b><div class="modal-sub">Quick help when needed</div></div>
-  </div></section>
 
   <!-- ================= REVIEWS ================= -->
   <section id="reviews">
@@ -965,8 +936,8 @@ const orderDone=document.getElementById('orderDone');
 function renderOrderCart(){
   const box=document.getElementById('cartItems');
   if(!orderCart.length){box.innerHTML='<div class="modal-sub">Your cart is empty. Add items from the menu.</div>';return}
-  const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
-  box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><b>Total</b><b>₹${total}</b></div>`;
+  const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0);const delivery=DELIVERY_SETTINGS.enabled!==false?(subtotal>=Number(DELIVERY_SETTINGS.freeThreshold||0)?0:Number(DELIVERY_SETTINGS.fee||0)):0;const total=subtotal+delivery;
+  box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><span>Subtotal</span><b>₹${subtotal}</b></div><div style="display:flex;justify-content:space-between;padding-top:6px"><span>Delivery</span><b>${delivery?'₹'+delivery:'FREE'}</b></div><div style="display:flex;justify-content:space-between;padding-top:10px;font-size:18px"><b>Total</b><b>₹${total}</b></div>`;
 }
 function addToOrder(name,price,upiId){const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
 window.addToOrder=addToOrder;
@@ -993,11 +964,11 @@ document.getElementById('orderForm').onsubmit=async e=>{
   const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
   try{
     const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    const total=orderCart.reduce((a,x)=>a+x.price*x.qty,0);
+    const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0);const deliveryCharge=DELIVERY_SETTINGS.enabled!==false?(subtotal>=Number(DELIVERY_SETTINGS.freeThreshold||0)?0:Number(DELIVERY_SETTINGS.fee||0)):0;const total=subtotal+deliveryCharge;
     const paymentMethod=document.getElementById('oPayment').value; if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
     const locationToken=Math.random().toString(36).slice(2)+Date.now().toString(36);
     const paymentStatus=paymentMethod==='cod'?'cod_pending':'pending';
-    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
+    await db.ref('orders/'+refId).set({orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),latitude:lat,longitude:lng,items:orderCart,subtotal,deliveryCharge,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',locationToken,createdAt:Date.now()});
     activeLocationOrderId=refId;activeLocationToken=locationToken;await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken});
     document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
     if(paymentMethod==='razorpay'&&PAYMENT_SETTINGS.razorpayKeyId){
