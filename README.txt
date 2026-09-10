@@ -1,31 +1,81 @@
-BON AMIGOS FINAL - READY TO USE
+BON AMIGOS — REALTIME DATABASE ONLY
+===================================
 
-Firebase project: restro-56bc7
+Backend:
+- Firebase Realtime Database = ALL application data
+- Firebase Authentication = Admin/Captain/Rider login only
+- Firebase Firestore = NOT USED
+- Firebase Storage = NOT USED
+- Product/logo/gallery images use public HTTPS image URLs
 
-IMPORTANT DEPLOY STEPS
-1. Upload all files in this folder to the same hosting root.
-2. Firebase Console -> Authentication -> Sign-in method -> Email/Password: ENABLE.
-3. Firebase Console -> Realtime Database -> Rules: paste database.rules.json and Publish.
-4. Open index.html once in a private/incognito tab after deployment to avoid old service-worker cache.
-5. Admin: sign in with an existing Firebase Auth admin account that is present under /admins/{uid}=true, /admins/{uid}.isAdmin=true, /adminEmails/{uid}=true, or /staff/{uid}.role="admin".
-6. Captain/Rider: Firebase Auth email/password account must exist AND /staff/{uid} must contain role="captain" or role="rider", active=true.
-7. Create staff accounts from Admin -> Captains/Riders after admin login. The admin page creates Firebase Auth users and staff records.
+Firebase setup
+--------------
+1) Open Firebase Console -> project restro-56bc7.
+2) Authentication -> Sign-in method -> Email/Password -> Enable.
+3) Build -> Realtime Database -> Create Database.
+4) Realtime Database -> Rules -> replace rules with database.rules.json -> Publish.
+5) Create the first Admin in Authentication -> Users -> Add user.
+6) Copy Admin UID.
+7) Realtime Database -> Data -> create:
+   admins
+     ADMIN_UID
+       isAdmin: true   (Boolean, not text)
 
-FIXES IN THIS BUILD
-- Admin authentication checks admins, adminEmails, and staff role=admin.
-- Firebase rules recognize admin staff role as well as existing admin records.
-- Customer email/password login persists locally and customer can order/book only while authenticated.
-- Fixed customer auth logout listener bug.
-- Customer order write permission and validation flow fixed.
-- Customer reservation write/query flow fixed.
-- Captain walk-in reservations are allowed without customerUid.
-- Rider assigned-order query is restricted to the logged-in rider.
-- Rider GPS can be removed when duty is turned off.
-- Admin product form now actually saves products.
-- Product images are selected from the PC/mobile file picker and compressed to JPEG data before saving; no remote image URL is required.
-- Delivery settings: enabled/disabled, fee, free-delivery threshold.
-- Table waiting queue and TV display retained.
-- Order, table, rider and captain dashboards retained.
+Hosting
+-------
+Upload ALL files to Hostinger public_html.
+Customer: /
+Admin: /admin.html
+Captain: /captain.html
+Rider: /rider.html
+Use HTTPS for GPS.
 
-SECURITY NOTE
-Do not publish service-account private keys in the web files. The Firebase web config is intended for client use; access is controlled by Realtime Database Rules.
+Admin
+-----
+- Tables: add/change free, reserved, occupied, cleaning, blocked.
+- Bookings: confirm, cancel, assign table.
+- Products: add price/category/description/image URL and optional product-specific UPI ID.
+- Captains/Riders: create and enable/disable accounts.
+- Orders: see customer address/GPS, customer live-location updates, payment status, and select an ONLINE rider to send the order.
+- Settings: business details, default UPI, COD on/off, optional Razorpay Key ID.
+
+Customer order + location
+-------------------------
+- Customer selects items and taps Use My GPS.
+- Order stores latitude/longitude in Realtime Database.
+- After order, Share Live Location can continue updating customerLocations/orderId while the page remains open.
+- Admin gets Customer Map and can send the order to an online rider.
+- Rider is considered online while rider GPS was updated within the last 90 seconds.
+
+Payments
+--------
+COD:
+- Admin can enable/disable COD.
+- If COD is disabled, it is not shown to customers.
+
+UPI:
+- Admin -> Settings -> Default UPI ID.
+- Product can have its own UPI ID. If the cart contains one product-UPI, that UPI is used; mixed UPI carts fall back to the restaurant default UPI.
+- Customer selects UPI; COD is not selected at the same time.
+- Customer can open a UPI app and optionally enter UTR/reference.
+- Admin manually confirms payment in Orders.
+
+Razorpay (optional):
+- Admin enables Razorpay and enters Key ID.
+- Customer sees Razorpay only when enabled and a key is configured.
+- Checkout opens from the browser and payment submission is stored in Realtime Database.
+- IMPORTANT: production Razorpay payment signature verification normally requires a secure server endpoint. This package intentionally has no server/backend other than Firebase Realtime Database, so Admin confirmation is still required.
+
+Important
+---------
+- Do NOT create/use Firestore for this package.
+- Do NOT create/use Firebase Storage for this package.
+- Public image URLs must be direct HTTPS image URLs.
+- GPS works only after browser permission and normally requires HTTPS.
+
+
+ADMIN/RULES COMPATIBILITY FIX
+- admins/{uid}=true supported.
+- admins/{uid}/isAdmin=true supported.
+- admin.html authorization supports both formats.
+- database.rules.json is the matching RTDB rules file.
