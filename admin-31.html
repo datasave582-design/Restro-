@@ -3,25 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Captain — Bon Amigos</title>
+<title>Admin — Bon Amigos</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#5F6B47">
-<link rel="manifest" href="captain-manifest.json">
+<meta name="theme-color" content="#7A1F2B">
+<link rel="manifest" href="admin-manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 
 <!-- ============================================================
-  BON AMIGOS — CAPTAIN APP (Phase 3)
-  A lighter, floor-facing dashboard for captains on shift:
-   - See at a glance how many tables are free/occupied/reserved
-     and how many bookings are pending/confirmed today.
-   - Mark tables free/occupied/reserved.
-   - View reservations and confirm/cancel them.
-  Captains CANNOT add or delete tables — that stays in admin.html.
+  BON AMIGOS — ADMIN (Phase 3)
+  Full-control dashboard for the owner/manager:
+   - Reservations tab: view, confirm, cancel bookings from the site
+   - Tables tab: add/remove tables, see live free/occupied/reserved
+     status, and change any table's status
+  Captains get a separate, lighter app: captain.html — same login
+  system, but scoped by role. Admin access is granted via an
+  `admins/{uid}` entry in the Realtime Database (not the `staff`
+  node — that one's for captains and riders).
 
-  SETUP: same Firebase project as admin.html and index.html — see
-  RESERVATIONS-SETUP.md. Each captain needs an Authentication user
-  PLUS a staff/{uid} entry: { role: "captain", active: true }.
-  (Admins can also open this app — access via admins/{uid} instead.)
+  SETUP (one-time, in Firebase Console) — see RESERVATIONS-SETUP.md
+  for full step-by-step instructions, including the security rules
+  and how to create staff accounts with a role.
   ============================================================ -->
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -32,7 +33,7 @@
   :root{
     --ink:#241A16; --ivory:#FBF7F1; --paper:#F3ECE2;
     --wine:#7A1F2B; --wine-deep:#5A1620; --gold:#B98A3B;
-    --olive:#5F6B47; --olive-deep:#495338; --line:rgba(36,26,22,0.12);
+    --olive:#5F6B47; --line:rgba(36,26,22,0.12);
     --free:#4B5636; --free-bg:#DCE6D3;
     --occupied:#7A1F2B; --occupied-bg:#EBD3D3;
     --reserved:#8A6417; --reserved-bg:#F3E3C8;
@@ -60,21 +61,21 @@
     width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:6px;
     font-size:0.95rem;background:#fff;
   }
-  .field input:focus{outline:none;border-color:var(--olive);}
+  .field input:focus{outline:none;border-color:var(--wine);}
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     padding:12px 20px;font-size:0.92rem;font-weight:600;border-radius:6px;width:100%;
-    background:var(--olive);color:#fff;
+    background:var(--wine);color:#fff;
   }
-  .btn:hover{background:var(--olive-deep);}
+  .btn:hover{background:var(--wine-deep);}
   .btn:disabled{opacity:0.6;cursor:default;}
-  .btn-sm{width:auto;padding:7px 14px;font-size:0.8rem;border-radius:5px;background:var(--olive);color:#fff;}
-  .btn-sm:hover{background:var(--olive-deep);}
+  .btn-sm{width:auto;padding:7px 14px;font-size:0.8rem;border-radius:5px;}
   .btn-outline-sm{
     width:auto;padding:6px 12px;font-size:0.78rem;border-radius:5px;
-    border:1.5px solid var(--line);color:var(--ink);background:none;
+    border:1.5px solid var(--line);color:var(--ink);
   }
-  .btn-outline-sm:hover{border-color:var(--olive);color:var(--olive);}
+  .btn-outline-sm:hover{border-color:var(--wine);color:var(--wine);}
+  .btn-outline-sm.danger:hover{border-color:var(--occupied);color:var(--occupied);}
   .login-error{color:var(--wine-deep);font-size:0.85rem;margin-top:14px;display:none;}
   .login-error.show{display:block;}
 
@@ -90,29 +91,16 @@
   #logoutBtn{color:#D8CEC2;font-size:0.85rem;}
   #logoutBtn:hover{color:#fff;}
 
-  /* ---- stats ---- */
-  .stats-row{
-    max-width:1100px;margin:0 auto;padding:20px 20px 0;
-    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
-  }
-  @media(min-width:700px){ .stats-row{grid-template-columns:repeat(6,1fr);} }
-  .stat-card{
-    background:var(--ivory);border:1px solid var(--line);border-radius:8px;
-    padding:12px 10px;text-align:center;
-  }
-  .stat-card .num{font-family:var(--font-display);font-size:1.5rem;color:var(--olive);}
-  .stat-card .lbl{font-size:0.7rem;color:#8C8074;text-transform:uppercase;letter-spacing:0.03em;}
-
   /* ---- tabs ---- */
   .tabbar{
-    max-width:1100px;margin:0 auto;padding:20px 20px 0;
+    max-width:1100px;margin:0 auto;padding:16px 20px 0;
     display:flex;gap:8px;
   }
   .tab-btn{
     padding:10px 18px;font-size:0.88rem;font-weight:700;border-radius:8px 8px 0 0;
     color:#6c5d54;border-bottom:3px solid transparent;
   }
-  .tab-btn.active{color:var(--olive);border-bottom-color:var(--olive);}
+  .tab-btn.active{color:var(--wine);border-bottom-color:var(--wine);}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
 
@@ -125,15 +113,17 @@
     padding:7px 14px;font-size:0.8rem;font-weight:600;border-radius:20px;
     border:1.5px solid var(--line);color:#6c5d54;background:var(--ivory);
   }
-  .filters button.active{background:var(--olive);border-color:var(--olive);color:#fff;}
+  .filters button.active{background:var(--wine);border-color:var(--wine);color:#fff;}
   .search-box input{
     padding:8px 14px;border:1.5px solid var(--line);border-radius:20px;font-size:0.85rem;
     width:220px;background:var(--ivory);
   }
-  .search-box input:focus{outline:none;border-color:var(--olive);}
+  .search-box input:focus{outline:none;border-color:var(--wine);}
 
   .content{max-width:1100px;margin:0 auto;padding:20px;}
-  .empty-state{text-align:center;padding:60px 20px;color:#8C8074;}
+  .empty-state{
+    text-align:center;padding:60px 20px;color:#8C8074;
+  }
   .empty-state h2{font-size:1.1rem;margin-bottom:6px;color:var(--ink);}
 
   .res-grid{display:grid;gap:12px;}
@@ -164,6 +154,27 @@
 
   .loading{text-align:center;padding:60px 20px;color:#8C8074;}
 
+  /* ---- stats ---- */
+  .stats-row{
+    max-width:1100px;margin:0 auto;padding:20px 20px 0;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
+  }
+  @media(min-width:700px){ .stats-row{grid-template-columns:repeat(4,1fr);} }
+  .stat-card{
+    background:var(--ivory);border:1px solid var(--line);border-radius:8px;
+    padding:14px 16px;text-align:center;
+  }
+  .stat-card .num{font-family:var(--font-display);font-size:1.6rem;color:var(--wine);}
+  .stat-card .lbl{font-size:0.75rem;color:#8C8074;text-transform:uppercase;letter-spacing:0.03em;}
+
+  /* ---- add table form ---- */
+  .add-table-form{
+    background:var(--ivory);border:1px solid var(--line);border-radius:8px;
+    padding:16px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:20px;
+  }
+  .add-table-form .field{margin:0;flex:1;min-width:110px;}
+  .add-table-form .btn{width:auto;padding:11px 20px;}
+
   /* ---- table grid ---- */
   .table-grid{display:grid;gap:14px;grid-template-columns:repeat(2,1fr);}
   @media(min-width:600px){ .table-grid{grid-template-columns:repeat(3,1fr);} }
@@ -188,7 +199,7 @@
 /* Match this to CONFIG.businessName in index.html */
 const BUSINESS_NAME = "Bon Amigos";
 
-/* Same values as FIREBASE_CONFIG in index.html and admin.html */
+/* Same values as FIREBASE_CONFIG in index.html and captain.html */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",
   authDomain: "restro-56bc7.firebaseapp.com",
@@ -206,8 +217,8 @@ const db = firebase.database();
 <!-- ================= LOGIN ================= -->
 <div class="login-screen" id="loginScreen">
   <div class="login-card">
-    <h1>Captain Login</h1>
-    <p id="loginSub">Sign in to view tables and reservations on shift.</p>
+    <h1>Admin Login</h1>
+    <p id="loginSub">Sign in to manage reservations and tables.</p>
     <form id="loginForm">
       <div class="field">
         <label for="loginEmail">Email</label>
@@ -226,28 +237,17 @@ const db = firebase.database();
 <!-- ================= DASHBOARD ================= -->
 <div class="dash" id="dash">
   <div class="topbar">
-    <div class="logo">Bon Amigos<span>Captain</span></div>
+    <div class="logo">Bon Amigos<span>Admin</span></div>
     <button id="logoutBtn">Sign Out</button>
   </div>
 
-  <div class="stats-row" id="overviewStats"></div>
-
   <div class="tabbar">
-    <button class="tab-btn active" data-tab="tables">Tables</button>
-    <button class="tab-btn" data-tab="reservations">Reservations</button>
-  </div>
-
-  <!-- ---- TABLES TAB ---- -->
-  <div class="tab-panel active" id="panel-tables">
-    <div class="content">
-      <div class="loading" id="loadingTablesState">Loading tables…</div>
-      <div class="table-grid" id="tableGrid" style="display:none;"></div>
-      <div class="empty-state" id="emptyTablesState" style="display:none;"></div>
-    </div>
+    <button class="tab-btn active" data-tab="reservations">Reservations</button>
+    <button class="tab-btn" data-tab="tables">Tables</button>
   </div>
 
   <!-- ---- RESERVATIONS TAB ---- -->
-  <div class="tab-panel" id="panel-reservations">
+  <div class="tab-panel active" id="panel-reservations">
     <div class="toolbar">
       <div class="filters" id="filters">
         <button data-filter="all" class="active">All</button>
@@ -268,6 +268,27 @@ const db = firebase.database();
       </div>
     </div>
   </div>
+
+  <!-- ---- TABLES TAB ---- -->
+  <div class="tab-panel" id="panel-tables">
+    <div class="stats-row" id="tableStats"></div>
+    <div class="content">
+      <form class="add-table-form" id="addTableForm">
+        <div class="field">
+          <label for="newTableNum">Table number</label>
+          <input type="number" id="newTableNum" min="1" required placeholder="e.g. 5">
+        </div>
+        <div class="field">
+          <label for="newTableCap">Seats</label>
+          <input type="number" id="newTableCap" min="1" required placeholder="e.g. 4">
+        </div>
+        <button type="submit" class="btn">Add Table</button>
+      </form>
+      <div class="loading" id="loadingTablesState">Loading tables…</div>
+      <div class="table-grid" id="tableGrid" style="display:none;"></div>
+      <div class="empty-state" id="emptyTablesState" style="display:none;"></div>
+    </div>
+  </div>
 </div>
 
 <script src="tables.js"></script>
@@ -275,8 +296,6 @@ const db = firebase.database();
 <script>
 let currentFilter = "all";
 let currentSearch = "";
-let latestTables = [];
-let latestReservations = [];
 
 /* ---- Auth + role check ---- */
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
@@ -305,14 +324,8 @@ auth.onAuthStateChanged(async (user) => {
       const adminSnap = await db.ref("admins/" + user.uid).get();
       const adminVal = adminSnap.val();
       const isAdmin = adminVal === true || (adminVal && adminVal.isAdmin === true);
-      let allowed = isAdmin;
-      if(!allowed){
-        const staffSnap = await db.ref("staff/" + user.uid).get();
-        const staff = staffSnap.val();
-        allowed = !!(staff && staff.role === "captain" && staff.active === true);
-      }
-      if(!allowed){
-        err.textContent = "This login isn't set up for captain access. Ask the owner to add your account to 'staff' with role 'captain' and active set to true.";
+      if(!isAdmin){
+        err.textContent = "This login isn't set up for admin access. Ask the owner to add your account under 'admins' in the database.";
         err.classList.add("show");
         await auth.signOut();
         return;
@@ -348,19 +361,34 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   });
 });
 
-/* ---- Overview stats (tables + today's bookings, combined) ---- */
-function renderOverview(){
-  const tc = tableCounts(latestTables);
-  const rc = reservationCounts(todaysReservations(latestReservations));
-  document.getElementById("overviewStats").innerHTML = `
-    <div class="stat-card"><div class="num">${tc.free}</div><div class="lbl">Tables Free</div></div>
-    <div class="stat-card"><div class="num">${tc.occupied}</div><div class="lbl">Occupied</div></div>
-    <div class="stat-card"><div class="num">${tc.reserved}</div><div class="lbl">Reserved</div></div>
-    <div class="stat-card"><div class="num">${tc.total}</div><div class="lbl">Total Tables</div></div>
-    <div class="stat-card"><div class="num">${rc.pending}</div><div class="lbl">Bookings Pending Today</div></div>
-    <div class="stat-card"><div class="num">${rc.confirmed}</div><div class="lbl">Confirmed Today</div></div>
-  `;
+/* ---- Reservations ---- */
+function onReservationsChange(list, err){
+  document.getElementById("loadingResState").style.display = "none";
+  if(err){
+    document.getElementById("loadingResState").style.display = "";
+    document.getElementById("loadingResState").textContent = "Couldn't load reservations. Check Firestore rules and your connection.";
+    return;
+  }
+  renderReservationGrid(
+    document.getElementById("resGrid"),
+    document.getElementById("emptyResState"),
+    filterReservations(list, currentFilter, currentSearch)
+  );
 }
+
+document.getElementById("filters").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-filter]");
+  if(!btn) return;
+  document.querySelectorAll("#filters button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentFilter = btn.dataset.filter;
+  onReservationsChange(allReservations);
+});
+
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  currentSearch = e.target.value.trim().toLowerCase();
+  onReservationsChange(allReservations);
+});
 
 /* ---- Tables ---- */
 function onTablesChange(list, err){
@@ -370,48 +398,27 @@ function onTablesChange(list, err){
     document.getElementById("loadingTablesState").textContent = "Couldn't load tables. Check Firestore rules and your connection.";
     return;
   }
-  latestTables = list;
   const grid = document.getElementById("tableGrid");
   const empty = document.getElementById("emptyTablesState");
-  if(!list.length){
-    grid.style.display = "none"; empty.style.display = "";
-    empty.innerHTML = `<h2>No tables set up yet</h2><p>Ask an admin to add tables from the admin dashboard.</p>`;
-  } else {
-    empty.style.display = "none"; grid.style.display = "grid";
-  }
-  renderTableGrid(grid, list, false);
-  renderOverview();
+  if(!list.length){ grid.style.display = "none"; empty.style.display = ""; }
+  else { empty.style.display = "none"; grid.style.display = "grid"; }
+  renderTableGrid(grid, list, true);
+
+  const c = tableCounts(list);
+  document.getElementById("tableStats").innerHTML = `
+    <div class="stat-card"><div class="num">${c.free}</div><div class="lbl">Free</div></div>
+    <div class="stat-card"><div class="num">${c.occupied}</div><div class="lbl">Occupied</div></div>
+    <div class="stat-card"><div class="num">${c.reserved}</div><div class="lbl">Reserved</div></div>
+    <div class="stat-card"><div class="num">${c.total}</div><div class="lbl">Total Tables</div></div>
+  `;
 }
 
-/* ---- Reservations ---- */
-function onReservationsChange(list, err){
-  document.getElementById("loadingResState").style.display = "none";
-  if(err){
-    document.getElementById("loadingResState").style.display = "";
-    document.getElementById("loadingResState").textContent = "Couldn't load reservations. Check Firestore rules and your connection.";
-    return;
-  }
-  latestReservations = list;
-  renderReservationGrid(
-    document.getElementById("resGrid"),
-    document.getElementById("emptyResState"),
-    filterReservations(list, currentFilter, currentSearch)
-  );
-  renderOverview();
-}
-
-document.getElementById("filters").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-filter]");
-  if(!btn) return;
-  document.querySelectorAll("#filters button").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  currentFilter = btn.dataset.filter;
-  onReservationsChange(latestReservations);
-});
-
-document.getElementById("searchInput").addEventListener("input", (e) => {
-  currentSearch = e.target.value.trim().toLowerCase();
-  onReservationsChange(latestReservations);
+document.getElementById("addTableForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const numEl = document.getElementById("newTableNum");
+  const capEl = document.getElementById("newTableCap");
+  await addTable(numEl.value, capEl.value);
+  numEl.value = ""; capEl.value = "";
 });
 
 /* ---- PWA ---- */

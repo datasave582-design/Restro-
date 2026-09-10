@@ -1,0 +1,14 @@
+{
+  "name": "Bon Amigos Captain",
+  "short_name": "BA Captain",
+  "description": "Live table status and reservations for captains on shift.",
+  "start_url": "./captain.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3ECE2",
+  "theme_color": "#5F6B47",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
