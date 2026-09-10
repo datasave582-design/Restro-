@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#7A1F2B">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Bon Amigos | Euro • Pizzeria • Pan Asian • Cafe & Dolci — Sector 104, Noida</title>
 <meta name="description" content="Bon Amigos in Sector 104, Noida — European, Pizzeria, Pan Asian, Cafe & Bakery under one roof. View the menu, book a table, or order online.">
 
@@ -289,21 +292,31 @@
   .success-summary span:first-child{color:#7a6c62;}
   .success-summary span:last-child{font-weight:700;}
   .success-actions{display:flex;flex-direction:column;gap:10px;}
+  .auth-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font-weight:700;font-size:.82rem;}
+  .auth-chip.logged{border-color:var(--olive);background:#f1f6ed;}
+  .auth-overlay{position:fixed;inset:0;background:rgba(24,18,15,.58);display:none;align-items:flex-end;justify-content:center;z-index:1200;padding:0;}
+  .auth-overlay.open{display:flex;}
+  .auth-card{width:min(560px,100%);background:var(--paper);border-radius:22px 22px 0 0;padding:26px 22px 30px;box-shadow:0 -20px 60px rgba(0,0,0,.2);}
+  @media(min-width:700px){.auth-overlay{align-items:center;padding:20px}.auth-card{border-radius:18px;padding:30px;}}
+  .auth-tabs{display:flex;gap:8px;margin:18px 0}.auth-tab{flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;font-weight:800;background:#fff}.auth-tab.active{background:var(--wine);color:#fff;border-color:var(--wine);}
+  .auth-note{font-size:.82rem;color:#75685f;margin:7px 0 16px;line-height:1.5}.auth-error{display:none;color:#8c1732;background:#fff0f2;border:1px solid #efc4cd;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.84rem}.auth-error.show{display:block;}
+  .user-menu{display:flex;align-items:center;gap:8px;margin-left:auto;}
 </style>
 
 <!-- ================= FIREBASE (Phase 2 — Table Reservations) =================
   Uses Firebase compat SDKs (no build step needed). Fill FIREBASE_CONFIG
   below with your project's config from Firebase Console > Project Settings.
   Also required in Firebase Console:
-  1. Firestore Database > Create database (production mode is fine).
-  2. Firestore Rules — allow public create, block public read (see rules
+  1. Realtime Database > Create Database.
+  2. Realtime Database Rules — use the included database.rules.json.
      snippet in the chat / README).
   3. Authentication > Sign-in method > enable Email/Password, then
      Authentication > Users > Add user to create your admin login
      (this same login is used on admin.html).
 ============================================================================= -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -338,15 +351,62 @@ function waLink(message){
    REPLACE with your Firebase project's config
    (Firebase Console > Project Settings > General > Your apps > SDK setup). */
 const FIREBASE_CONFIG = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyCmrAbpKaR0cSkigBs8rbW9g8l2db47n9A",
+  databaseURL: "https://restro-56bc7-default-rtdb.firebaseio.com",
+  authDomain: "restro-56bc7.firebaseapp.com",
+  projectId: "restro-56bc7",
+  storageBucket: "restro-56bc7.firebasestorage.app",
+  messagingSenderId: "636167397540",
+  appId: "1:636167397540:web:cfc9d31275fc8832b9c631",
+  measurementId: "G-X3QF67PKXS"
 };
-firebase.initializeApp(FIREBASE_CONFIG);
-const db = firebase.firestore();
+const customerApp = firebase.initializeApp(FIREBASE_CONFIG,'bonAmigosCustomerPortal');
+const db = customerApp.database();
+const auth = customerApp.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
+
+// Realtime public menu: Admin changes products here are reflected on the customer site.
+db.ref('settings/restaurant').on('value', snap => {
+  const s=snap.val()||{};
+  if(s.businessName) CONFIG.businessName=s.businessName;
+  if(s.phone) CONFIG.phone=s.phone;
+  if(s.address) CONFIG.address=s.address;
+  if(s.mapsUrl) CONFIG.mapsUrl=s.mapsUrl;
+  if(s.logoUrl){ const logos=document.querySelectorAll('[data-restaurant-logo]'); logos.forEach(el=>el.src=s.logoUrl); }
+  const set=(id,val)=>{const el=document.getElementById(id); if(el && val!=null) el.textContent=val;};
+  set('footAddress',CONFIG.address); set('footPhone',CONFIG.phone);
+  const fm=document.getElementById('footMaps'); if(fm && CONFIG.mapsUrl) fm.href=CONFIG.mapsUrl;
+});
+
+let PAYMENT_SETTINGS={upiId:'',upiName:'',codEnabled:true,razorpayEnabled:false,razorpayKeyId:''};let DELIVERY_SETTINGS={enabled:true,fee:30,freeThreshold:300};
+db.ref('settings/payment').on('value', snap=>{ PAYMENT_SETTINGS=Object.assign(PAYMENT_SETTINGS,snap.val()||{}); refreshPaymentUI(); });db.ref('settings/delivery').on('value', snap=>{ DELIVERY_SETTINGS=Object.assign(DELIVERY_SETTINGS,snap.val()||{}); refreshPaymentUI(); renderOrderCart(); });
+function cartEffectiveUpi(){
+  const ids=[...new Set(orderCart.map(x=>String(x.upiId||'').trim()).filter(Boolean))];
+  return ids.length===1?ids[0]:(PAYMENT_SETTINGS.upiId||'');
+}
+function refreshPaymentUI(){
+  const sel=document.getElementById('oPayment'); if(!sel)return;
+  const current=sel.value;
+  sel.innerHTML='';
+  if(PAYMENT_SETTINGS.codEnabled!==false){sel.insertAdjacentHTML('beforeend','<option value="cod">Cash on Delivery</option>');}
+  if(cartEffectiveUpi())sel.insertAdjacentHTML('beforeend','<option value="upi">UPI / Pay by UPI</option>');
+  if(PAYMENT_SETTINGS.razorpayEnabled===true && PAYMENT_SETTINGS.razorpayKeyId)sel.insertAdjacentHTML('beforeend','<option value="razorpay">Razorpay</option>');
+  if([...sel.options].some(o=>o.value===current))sel.value=current; else if(sel.options.length)sel.selectedIndex=0;
+  const upi=cartEffectiveUpi(); const box=document.getElementById('upiBox');
+  if(box){box.style.display=sel.value==='upi'?'block':'none'; const id=document.getElementById('upiIdDisplay'); if(id)id.textContent=upi||'UPI not configured'; const name=document.getElementById('upiNameDisplay'); if(name)name.textContent=PAYMENT_SETTINGS.upiName||CONFIG.businessName;}
+  const utr=document.getElementById('utrWrap'); if(utr)utr.style.display=sel.value==='upi'?'block':'none';
+  const rz=document.getElementById('razorpayNote'); if(rz)rz.style.display=sel.value==='razorpay'?'block':'none';
+  const a=document.getElementById('upiPayLink'); const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0); if(a&&upi){a.href='upi://pay?pa='+encodeURIComponent(upi)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}
+}
+
+db.ref('products').on('value', snap => {
+  const val=snap.val()||{};
+  const live=Object.values(val).filter(x=>x && x.active!==false);
+  const box=document.getElementById('dishScroller');
+  if(!box) return;
+  if(!live.length){ box.innerHTML='<div class="menu-empty" style="padding:24px;text-align:center;width:100%;color:#75685f">Menu is being updated. Please check again shortly.</div>'; return; }
+  box.innerHTML=live.map(d=>`<div class="dish-card"><div class="dish-img">${d.image?`<img src="${String(d.image).replace(/"/g,'&quot;')}" alt="${String(d.name||'').replace(/"/g,'&quot;')}">`:''}<span class="veg-dot"></span></div><div class="dish-body"><h3>${String(d.name||'')}</h3><p>${String(d.description||'')}</p><div class="dish-foot"><span class="price">₹${Number(d.price||0)}</span><button class="add-btn" onclick="addToOrder('${String(d.name||'').replace(/'/g,"\\'")}',${Number(d.price||0)})">Add to Order</button></div></div></div>`).join('');
+});
 
 /* ================= RESERVATION SETTINGS =================
    Edit to match real service hours / booking rules. */
@@ -460,10 +520,10 @@ const RESERVE_CONFIG = {
     <div class="wrap" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;">
       <div style="max-width:480px;">
         <h2 style="font-size:1.6rem;">Ready to order or reserve a table?</h2>
-        <p style="color:#5c4f47;margin-top:8px;">Full online ordering and table booking flows are built in the next phase — for now, order and reserve directly on WhatsApp or by phone.</p>
+        <p style="color:#5c4f47;margin-top:8px;">Choose your favourites, add your delivery details and place an order directly from the website.</p>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;" id="reserve">
-        <a class="btn btn-primary" id="waOrder" href="#" target="_blank" rel="noopener">Order via WhatsApp</a>
+        <button class="btn btn-primary" id="openOrder" type="button">Order Online</button>
         <a class="btn btn-outline" id="waReserve" href="#" target="_blank" rel="noopener">Book via WhatsApp</a>
         <a class="btn btn-outline" id="callNow" href="tel:">Call Now</a>
       </div>
@@ -514,6 +574,7 @@ const RESERVE_CONFIG = {
 </a>
 
 <!-- ================= STICKY MOBILE BOTTOM NAV ================= -->
+<div class="user-menu" style="position:fixed;right:14px;top:14px;z-index:1100;"><button id="customerAccountBtn" class="auth-chip" type="button">👤 Login</button></div>
 <nav class="mobile-nav" aria-label="Mobile primary">
   <a href="#home" class="active">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
@@ -536,6 +597,53 @@ const RESERVE_CONFIG = {
     WhatsApp
   </a>
 </nav>
+
+<!-- ================= CUSTOMER AUTH MODAL ================= -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="modal-close" id="authClose" aria-label="Close">✕</button>
+    <h2 id="authTitle">Welcome to Bon Amigos</h2>
+    <p class="modal-sub" id="authSubtitle">Login to order food or book a table.</p>
+    <div class="auth-tabs"><button type="button" class="auth-tab active" id="loginTab">Login</button><button type="button" class="auth-tab" id="signupTab">Create account</button></div>
+    <div id="googleLoginBox" style="margin:14px 0 10px">
+      <button class="btn btn-outline" id="googleLoginBtn" type="button" style="width:100%;font-weight:800">🌐 Continue with Google</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0;color:#8a7b70;font-size:12px"><span style="height:1px;background:#ded2c5;flex:1"></span>OR EMAIL</div>
+    </div>
+    <form id="customerAuthForm" novalidate>
+      <div class="form-field"><label>Email Address</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>
+      <div class="form-field" id="authMobileWrap" style="display:none"><label>Mobile Number</label><input id="authMobile" type="tel" autocomplete="tel" placeholder="10-digit mobile number"></div>
+      <div class="form-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Minimum 6 characters"></div>
+      <div id="authError" class="auth-error"></div>
+      <button class="btn btn-primary" id="authSubmit" type="submit">Login</button>
+    </form>
+    <p class="auth-note">Google login is the easiest option. On first Google login, we will ask only for your mobile number to complete your profile. No mobile OTP is required.</p>
+  </div>
+</div>
+
+<!-- ================= ONLINE ORDER MODAL ================= -->
+<div class="modal-overlay" id="orderOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="modal-close" id="orderClose" aria-label="Close">✕</button>
+    <div id="orderFormView">
+      <h2>Order Online</h2><p class="modal-sub">Delivery to your location</p>
+      <div id="cartItems" style="margin-bottom:14px"></div>
+      <form id="orderForm" novalidate>
+        <div class="form-field"><label>Full Name</label><input id="oName" required autocomplete="name"></div>
+        <div class="form-field"><label>Mobile Number</label><input id="oPhone" type="tel" required autocomplete="tel" placeholder="10-digit mobile number"></div>
+        <div class="form-field"><label>Delivery Address</label><textarea id="oAddress" required placeholder="House, street, area, city"></textarea></div>
+        <div style="display:flex;gap:8px;align-items:center;margin:8px 0"><button type="button" class="btn btn-outline" id="useGps">📍 Use My GPS</button><span id="gpsStatus" class="modal-sub">GPS not set</span></div>
+        <input type="hidden" id="oLat"><input type="hidden" id="oLng">
+        <div class="form-field"><label>GPS / Location Address (optional)</label><input id="oGpsAddress" placeholder="Detected location name"></div>
+        <div class="form-field"><label>Payment Method</label><select id="oPayment"></select></div>
+<div id="upiBox" style="display:none;background:#f3ece2;border:1px solid #ded2c5;border-radius:10px;padding:12px;margin:6px 0"><b>Pay to UPI</b><div id="upiNameDisplay" class="modal-sub"></div><div style="font-weight:800;margin:5px 0" id="upiIdDisplay"></div><a id="upiPayLink" class="btn btn-outline" href="#" style="display:inline-block" target="_blank">Open UPI App</a></div>
+<div id="utrWrap" style="display:none" class="form-field"><label>UPI Transaction / UTR No. (optional)</label><input id="oUtr" placeholder="Enter UTR after payment"></div>
+<div id="razorpayNote" style="display:none" class="modal-sub">Razorpay checkout will open after you place the order.</div>
+        <div id="orderError" class="error-msg"></div><button class="btn btn-primary" id="orderSubmit" type="submit">Place Order</button>
+      </form>
+    </div>
+    <div id="orderSuccess" style="display:none"><h2>Order Placed 🎉</h2><p id="orderSuccessText"></p><p id="liveTrackStatus" class="modal-sub">Your GPS location has been sent to the restaurant.</p><button class="btn btn-outline" id="shareLiveLocation" type="button">📍 Share Live Location</button> <button class="btn btn-primary" id="orderDone">Done</button></div>
+  </div>
+</div>
 
 <!-- ================= RESERVATION MODAL ================= -->
 <div class="modal-overlay" id="reserveOverlay">
@@ -580,6 +688,12 @@ const RESERVE_CONFIG = {
 
         <button type="submit" class="btn btn-primary modal-submit" id="reserveSubmit">Request Table</button>
       </form>
+    </div>
+
+    <div id="myTableStatus" style="display:none;margin:0 0 16px;padding:16px;border:1px solid #e6d7c8;border-radius:14px;background:#fbf7f1;box-shadow:0 8px 24px rgba(45,30,20,.06);">
+      <div style="font-weight:800;font-size:18px;" id="myTableStatusTitle">Table request status</div>
+      <div id="myTableStatusText" class="modal-sub" style="margin-top:6px;"></div>
+      <div id="myTableStatusMeta" style="margin-top:10px;font-weight:700;"></div>
     </div>
 
     <div id="reserveSuccessView" class="success-state" style="display:none;">
@@ -642,7 +756,7 @@ document.getElementById("reviewCountNum").textContent = totalReviews ? totalRevi
 
 // WhatsApp links (prefilled messages, per spec section 9)
 document.getElementById("waHero").href = waLink(`Hello ${CONFIG.businessName}, I would like to know about today's menu.`);
-document.getElementById("waOrder").href = waLink(`Hello ${CONFIG.businessName}, I would like to place an order.`);
+const waOrder=document.getElementById("waOrder"); if(waOrder) waOrder.href = waLink(`Hello ${CONFIG.businessName}, I would like to place an order.`);
 document.getElementById("waReserve").href = waLink(`Hello ${CONFIG.businessName}, I would like to book a table.`);
 document.getElementById("waFloat").href = waLink(`Hello ${CONFIG.businessName}, I have a question.`);
 document.getElementById("waNav").href = waLink(`Hello ${CONFIG.businessName}, I have a question.`);
@@ -672,7 +786,7 @@ document.getElementById("dishScroller").innerHTML = DISHES.map(d => `
       <p>${d.desc}</p>
       <div class="dish-foot">
         <span class="price">${d.price}</span>
-        <button class="add-btn" onclick="window.open(waLink('Hello ${CONFIG.businessName}, I would like to order: ${d.name}'), '_blank')">Add to Order</button>
+        <button class="add-btn" onclick="addToOrder('${String(d.name).replace(/'/g,"\\'")}', Number(String('${d.price}').replace(/[^0-9.]/g,'')))">Add to Order</button>
       </div>
     </div>
   </div>
@@ -718,14 +832,18 @@ reserveOverlay.addEventListener("click", (e) => { if (e.target === reserveOverla
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && reserveOverlay.classList.contains("open")) closeReserveModal(); });
 
 function openReserveModal(){
+  if(!auth.currentUser){ pendingCustomerAction="reserve"; openCustomerAuth(); return; }
   reserveFormView.style.display = "";
   reserveSuccess.style.display = "none";
+  const statusBox=document.getElementById('myTableStatus'); if(statusBox && auth.currentUser) statusBox.style.display='block';
   reserveError.classList.remove("show");
   reserveSubmitBtn.disabled = false;
   reserveSubmitBtn.textContent = "Request Table";
   populateGuestOptions();
   setMinDate();
   populateTimeSlots();
+  const profile=customerProfile||{};
+  document.getElementById("rPhone").value=profile.mobile||document.getElementById("rPhone").value||"";
   reserveOverlay.classList.add("open");
   document.body.style.overflow = "hidden";
 }
@@ -783,6 +901,7 @@ function populateTimeSlots(){
 
 reserveForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if(!auth.currentUser){ pendingCustomerAction="reserve"; closeReserveModal(); openCustomerAuth(); return; }
   reserveError.classList.remove("show");
 
   const name   = document.getElementById("rName").value.trim();
@@ -810,16 +929,19 @@ reserveForm.addEventListener("submit", async (e) => {
   const booking = {
     name, phone: phoneDigits, date, time,
     guests: Number(guests), notes,
+    customerUid: auth.currentUser.uid,
+    customerEmail: auth.currentUser.email || "",
     status: "pending",
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    customerVisibleStatus: "request_received",
+    createdAt: Date.now()
   };
 
   try{
-    await db.collection("reservations").add(booking);
+    const bookingId="r_"+Date.now()+"_"+Math.random().toString(36).slice(2,7); await db.ref("reservations/"+bookingId).set(booking);
     showReservationSuccess(booking);
   }catch(err){
     console.error("Reservation save failed:", err);
-    reserveError.textContent = "Something went wrong. Please try again, or book directly via WhatsApp below.";
+    reserveError.textContent = (err && err.code === 'PERMISSION_DENIED') ? 'Firebase permission denied. Please publish the latest database.rules.json, then try again.' : "Something went wrong. Please try again, or book directly via WhatsApp below.";
     reserveError.classList.add("show");
     reserveSubmitBtn.disabled = false;
     reserveSubmitBtn.textContent = "Request Table";
@@ -846,10 +968,266 @@ function showReservationSuccess(booking){
     + (booking.notes ? `\nNote: ${booking.notes}` : "");
   document.getElementById("successWaBtn").href = waLink(waMsg);
 }
+
+/* ================= LIVE TABLE REQUEST STATUS =================
+   Customers can see only their own reservation records. Staff changes are
+   reflected here in realtime: waiting -> confirmed/table -> seated -> completed. */
+let waitingDisplay={};
+db.ref('waitingDisplay').on('value',s=>{waitingDisplay=s.val()||{};});
+let lastReservationStatus={};
+let myReservationListener=null;
+function customerToast(title,message){let el=document.getElementById('customerToast');if(!el){el=document.createElement('div');el.id='customerToast';el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;z-index:9999;max-width:min(92vw,520px);background:#241716;color:#fff;border-radius:18px;padding:15px 18px;box-shadow:0 18px 50px #0006;transition:.25s;font-weight:700';document.body.appendChild(el);}el.innerHTML='<div style="font-size:16px">'+title+'</div><div style="font-size:13px;font-weight:500;opacity:.85;margin-top:3px">'+message+'</div>';requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='translate(-50%,0)'});setTimeout(()=>{el.style.opacity='0';el.style.transform='translate(-50%,20px)'},5000);try{if('Notification' in window && Notification.permission==='granted')new Notification(title,{body:message});}catch(e){}}
+function requestCustomerNotifications(){try{if('Notification' in window && Notification.permission==='default')Notification.requestPermission().catch(()=>{});}catch(e){}}
+
+function watchMyTableReservations(){
+  const u=auth.currentUser;
+  if(!u || !db) return;
+  if(myReservationListener) db.ref('reservations').orderByChild('customerUid').equalTo(u.uid).off('value',myReservationListener);
+  myReservationListener=snap=>{
+    const all=snap.val()||{};
+    const mine=Object.entries(all).map(([id,v])=>({id,...(v||{})})).filter(x=>x.customerUid===u.uid);
+    Object.entries(all).forEach(([id,v])=>{if(v&&v.status==='completed' && lastReservationStatus[id] && lastReservationStatus[id]!=='completed'){showDiningCompleteMessage();customerToast('💛 Thanks for dining at '+CONFIG.businessName,'Your table has been released. We hope to see you again!');}
+      if(v&&['confirmed','reserved'].includes(v.status) && lastReservationStatus[id] && !['confirmed','reserved'].includes(lastReservationStatus[id])){customerToast('🎉 Your table is ready',v.tableNumber?'Table '+v.tableNumber+' is reserved for you.':'Your table has been assigned.');} if(v) lastReservationStatus[id]=v.status||'';});
+    mine.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    const current=mine.find(x=>!['cancelled','completed'].includes(x.status||''));
+    const completed=mine.find(x=>x.status==='completed' && lastReservationStatus[x.id]==='completed');
+    const box=document.getElementById('myTableStatus');
+    if(!box) return;
+    if(!current){box.style.display='none';return;}
+    box.style.display='block';
+    const title=document.getElementById('myTableStatusTitle'),text=document.getElementById('myTableStatusText'),meta=document.getElementById('myTableStatusMeta');
+    const tableNo=current.tableNumber || '';
+    const queue=(waitingDisplay.queue||[]);
+    const qItem=queue.find(q=>q.id===current.id);
+    const liveWaitPosition=qItem?.position || current.waitPosition || null;
+    if(current.status==='waiting' || (current.status==='pending' && Number(waitingDisplay.freeTables||0)===0)){
+      current.status='waiting';
+      title.textContent='⏳ Please wait — all tables are busy';
+      text.textContent='Your table request is safely in the waiting queue. We will assign a table as soon as one becomes available.';
+      meta.textContent=liveWaitPosition ? `Waiting position: #${liveWaitPosition}` : 'Waiting position is updating live.';
+    }else if(current.status==='confirmed' || current.status==='reserved'){
+      title.textContent='🎉 Your table is ready';
+      text.textContent='Your table request has been accepted. Please come to the restaurant / waiting area.';
+      meta.textContent=tableNo ? `Your Table: ${tableNo}` : 'Table assigned — please ask the captain.';
+    }else if(current.status==='seated'){
+      title.textContent='🍽️ Enjoy your meal';
+      text.textContent='You are seated. Your table will disappear from this status when the captain frees it after your meal.';
+      meta.textContent=tableNo ? `Table ${tableNo} • Seated` : 'Seated';
+    }else{
+      title.textContent='✓ Request received';
+      text.textContent='Your table request has been received. We are checking availability now.';
+      meta.textContent='Status: Waiting for confirmation';
+    }
+  };
+  db.ref('reservations').orderByChild('customerUid').equalTo(u.uid).on('value',myReservationListener);
+}
+function showDiningCompleteMessage(){
+  const key='ba_dining_thanks_shown';
+  if(sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key,'1');
+  const box=document.getElementById('myTableStatus');
+  if(box){box.style.display='block';document.getElementById('myTableStatusTitle').textContent=`💛 Thanks for dining at ${CONFIG.businessName}`;document.getElementById('myTableStatusText').textContent='We hope you had a wonderful time. We look forward to seeing you again!';document.getElementById('myTableStatusMeta').textContent='Your table request is now closed.';setTimeout(()=>box.style.display='none',9000);}
+}
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
 
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}</script>
+
+<script>
+/* ================= CUSTOMER AUTHENTICATION ================= */
+let pendingCustomerAction=null;
+let customerProfile={};
+const authOverlay=document.getElementById('authOverlay');
+const authForm=document.getElementById('customerAuthForm');
+const loginTab=document.getElementById('loginTab');
+const signupTab=document.getElementById('signupTab');
+const authMobileWrap=document.getElementById('authMobileWrap');
+const authSubmit=document.getElementById('authSubmit');
+const authError=document.getElementById('authError');
+const accountBtn=document.getElementById('customerAccountBtn');
+const googleLoginBtn=document.getElementById('googleLoginBtn');
+let authMode='login';
+let completingGoogleProfile=false;
+function openCustomerAuth(mode='login'){
+  completingGoogleProfile=false; authMode=mode; updateAuthMode(); authError.classList.remove('show');
+  authOverlay.classList.add('open'); document.body.style.overflow='hidden';
+  setTimeout(()=>document.getElementById('authEmail').focus(),50);
+}
+function closeCustomerAuth(){authOverlay.classList.remove('open');if(!reserveOverlay.classList.contains('open')&&!orderOverlay.classList.contains('open'))document.body.style.overflow='';}
+function updateAuthMode(){
+  const signup=authMode==='signup';
+  loginTab.classList.toggle('active',!signup); signupTab.classList.toggle('active',signup);
+  authMobileWrap.style.display=signup?'':'none'; authSubmit.textContent=signup?'Create account':'Login';
+  document.getElementById('authTitle').textContent=signup?'Create your Bon Amigos account':'Welcome back';
+  document.getElementById('authSubtitle').textContent=signup?'Add your email and mobile once, then you can order and book easily.':'Login to order food or book a table.';
+  document.getElementById('authPassword').autocomplete=signup?'new-password':'current-password';
+  googleLoginBtn.style.display=signup?'none':'';
+}
+loginTab.onclick=()=>{if(!completingGoogleProfile){authMode='login';updateAuthMode()}};
+signupTab.onclick=()=>{if(!completingGoogleProfile){authMode='signup';updateAuthMode()}};
+document.getElementById('authClose').onclick=()=>{if(!completingGoogleProfile)closeCustomerAuth()};
+authOverlay.addEventListener('click',e=>{if(e.target===authOverlay&&!completingGoogleProfile)closeCustomerAuth()});
+accountBtn.onclick=()=>{if(auth.currentUser){if(confirm('Log out from Bon Amigos?'))auth.signOut();}else openCustomerAuth('login')};
+
+function continuePendingAction(){
+  closeCustomerAuth(); requestCustomerNotifications(); updateAuthMode();
+  if(pendingCustomerAction==='order'){pendingCustomerAction=null;renderOrderCart();orderOverlay.classList.add('open');document.body.style.overflow='hidden';}
+  else if(pendingCustomerAction==='reserve'){pendingCustomerAction=null;openReserveModal();}
+}
+async function completeGoogleProfile(user){
+  const snap=await db.ref('customers/'+user.uid).once('value');
+  customerProfile=snap.val()||{};
+  const existingMobile=String(customerProfile.mobile||'').replace(/\D/g,'');
+  if(existingMobile.length>=10){continuePendingAction();return;}
+  completingGoogleProfile=true;
+  document.getElementById('authTitle').textContent='Complete your profile';
+  document.getElementById('authSubtitle').textContent='Google login successful. Enter your mobile number once to continue.';
+  loginTab.style.display='none'; signupTab.style.display='none'; googleLoginBtn.style.display='none';
+  document.getElementById('authEmail').value=user.email||'';
+  document.getElementById('authEmail').readOnly=true;
+  document.getElementById('authPassword').style.display='none';
+  document.querySelector('#authFormPassword')?.remove();
+  authMobileWrap.style.display='';
+  document.getElementById('authMobile').required=true;
+  authSubmit.textContent='Save & Continue';
+}
+
+googleLoginBtn.onclick=async()=>{
+  authError.classList.remove('show'); googleLoginBtn.disabled=true; googleLoginBtn.textContent='Connecting…';
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
+    let cred;
+    try{cred=await auth.signInWithPopup(provider);}catch(e){
+      if(['auth/popup-blocked','auth/popup-cancelled-by-user','auth/operation-not-supported-in-this-environment'].includes(e.code)){
+        await auth.signInWithRedirect(provider); return;
+      }
+      throw e;
+    }
+    await completeGoogleProfile(cred.user);
+  }catch(err){console.error(err);authError.textContent=err.message||'Google login failed.';authError.classList.add('show');}
+  finally{googleLoginBtn.disabled=false;googleLoginBtn.textContent='🌐 Continue with Google';}
+};
+
+authForm.onsubmit=async e=>{
+  e.preventDefault(); authError.classList.remove('show');
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPassword').value;
+  const mobile=document.getElementById('authMobile').value.replace(/\D/g,'');
+  try{
+    if(completingGoogleProfile){
+      if(mobile.length<10){throw new Error('Please enter a valid 10-digit mobile number.');}
+      authSubmit.disabled=true; authSubmit.textContent='Saving…';
+      const user=auth.currentUser;
+      if(!user) throw new Error('Google session expired. Please login again.');
+      await db.ref('customers/'+user.uid).set({name:user.displayName||customerProfile.name||'',email:user.email||customerProfile.email||'',mobile,provider:'google',createdAt:customerProfile.createdAt||Date.now(),updatedAt:Date.now()});
+      customerProfile={...customerProfile,name:user.displayName||'',email:user.email||'',mobile,provider:'google'};
+      completingGoogleProfile=false; loginTab.style.display=''; signupTab.style.display=''; document.getElementById('authEmail').readOnly=false; document.getElementById('authPassword').style.display='';
+      document.getElementById('authMobile').required=false; updateAuthMode(); continuePendingAction(); return;
+    }
+    if(!email||!password){throw new Error('Please enter your email and password.');}
+    if(authMode==='signup'&&mobile.length<10){throw new Error('Please enter a valid 10-digit mobile number.');}
+    authSubmit.disabled=true; authSubmit.textContent=authMode==='signup'?'Creating…':'Logging in…';
+    let cred;
+    if(authMode==='signup'){
+      cred=await auth.createUserWithEmailAndPassword(email,password);
+      await db.ref('customers/'+cred.user.uid).set({name:cred.user.displayName||'',email,mobile,provider:'password',createdAt:Date.now(),updatedAt:Date.now()});
+      customerProfile={email,mobile,provider:'password'};
+    }else{
+      cred=await auth.signInWithEmailAndPassword(email,password);
+      const snap=await db.ref('customers/'+cred.user.uid).once('value'); customerProfile=snap.val()||{};
+    }
+    continuePendingAction();
+  }catch(err){console.error(err);let msg=err.message||'Login failed.';if(err.code==='auth/email-already-in-use')msg='This email is already registered. Please use Login or Google.';if(err.code==='auth/invalid-credential')msg='Incorrect email or password.';if(err.code==='auth/weak-password')msg='Password must be at least 6 characters.';if(err.code==='auth/account-exists-with-different-credential')msg='This email already uses another sign-in method. Try Google or email login.';authError.textContent=msg;authError.classList.add('show');}
+  finally{authSubmit.disabled=false;if(!completingGoogleProfile)updateAuthMode();}
+};
+
+auth.getRedirectResult().then(async result=>{if(result&&result.user)await completeGoogleProfile(result.user);}).catch(err=>{console.error(err);authError.textContent=err.message||'Google login failed.';authError.classList.add('show');});
+
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    try{const snap=await db.ref('customers/'+user.uid).once('value');customerProfile=snap.val()||{};}catch(e){customerProfile={};}
+    accountBtn.textContent='👤 '+(customerProfile.mobile||user.email||'Account');accountBtn.classList.add('logged');watchMyTableReservations();
+  }else{customerProfile={};accountBtn.textContent='👤 Login';accountBtn.classList.remove('logged');if(myReservationListener){myReservationListener=null;}}
+});
+</script>
+
+<script>
+/* ================= ONLINE ORDERING ================= */
+let orderCart=[];
+const orderOverlay=document.getElementById('orderOverlay');
+const orderOpen=document.getElementById('openOrder');
+const orderClose=document.getElementById('orderClose');
+const orderDone=document.getElementById('orderDone');
+function renderOrderCart(){
+  const box=document.getElementById('cartItems');
+  if(!orderCart.length){box.innerHTML='<div class="modal-sub">Your cart is empty. Add items from the menu.</div>';return}
+  const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0);const delivery=DELIVERY_SETTINGS.enabled!==false?(subtotal>=Number(DELIVERY_SETTINGS.freeThreshold||0)?0:Number(DELIVERY_SETTINGS.fee||0)):0;const total=subtotal+delivery;
+  box.innerHTML=orderCart.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ddd"><span>${x.name} × ${x.qty}</span><b>₹${x.price*x.qty}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding-top:10px"><span>Subtotal</span><b>₹${subtotal}</b></div><div style="display:flex;justify-content:space-between;padding-top:6px"><span>Delivery</span><b>${delivery?'₹'+delivery:'FREE'}</b></div><div style="display:flex;justify-content:space-between;padding-top:10px;font-size:18px"><b>Total</b><b>₹${total}</b></div>`;
+}
+function addToOrder(name,price,upiId){if(!auth.currentUser){pendingCustomerAction='order';openCustomerAuth();return;}const x=orderCart.find(i=>i.name===name);if(x)x.qty++;else orderCart.push({name,price:Number(price)||0,qty:1,upiId:upiId||''});renderOrderCart();refreshPaymentUI();orderOverlay.classList.add('open');}
+window.addToOrder=addToOrder;
+if(orderOpen)orderOpen.onclick=()=>{if(!auth.currentUser){pendingCustomerAction='order';openCustomerAuth();return;}renderOrderCart();orderOverlay.classList.add('open')};
+if(orderClose)orderClose.onclick=()=>orderOverlay.classList.remove('open');
+if(orderDone)orderDone.onclick=()=>{orderOverlay.classList.remove('open');if(locationWatchId!=null&&navigator.geolocation){navigator.geolocation.clearWatch(locationWatchId);locationWatchId=null;}};
+if(orderOverlay)orderOverlay.addEventListener('click',e=>{if(e.target===orderOverlay)orderOverlay.classList.remove('open')});
+document.getElementById('oPayment').addEventListener('change',()=>{refreshPaymentUI();const u=cartEffectiveUpi(),a=document.getElementById('upiPayLink');const total=orderCart.reduce((x,y)=>x+y.price*y.qty,0);if(a&&u){a.href='upi://pay?pa='+encodeURIComponent(u)+'&pn='+encodeURIComponent(PAYMENT_SETTINGS.upiName||CONFIG.businessName)+'&am='+encodeURIComponent(total.toFixed(2))+'&cu=INR';}});
+
+document.getElementById('useGps').onclick=()=>{
+  const st=document.getElementById('gpsStatus');st.textContent='Getting location…';
+  if(!navigator.geolocation){st.textContent='GPS unavailable';return}
+  navigator.geolocation.getCurrentPosition(async p=>{
+    document.getElementById('oLat').value=p.coords.latitude;document.getElementById('oLng').value=p.coords.longitude;st.textContent='GPS captured ✓';
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${p.coords.latitude}&lon=${p.coords.longitude}`);const j=await r.json();if(j.display_name){document.getElementById('oGpsAddress').value=j.display_name;if(!document.getElementById('oAddress').value)document.getElementById('oAddress').value=j.display_name}}catch(e){}
+  },()=>{st.textContent='Please allow location permission'}, {enableHighAccuracy:true,timeout:10000,maximumAge:0});
+};
+document.querySelectorAll('a[href="#order"]').forEach(a=>a.addEventListener('click',e=>{if(!auth.currentUser){e.preventDefault();pendingCustomerAction='order';openCustomerAuth();}}));
+document.getElementById('orderForm').onsubmit=async e=>{
+  e.preventDefault();if(!auth.currentUser){pendingCustomerAction='order';orderOverlay.classList.remove('open');openCustomerAuth();return;}const err=document.getElementById('orderError');err.classList.remove('show');
+  if(!orderCart.length){err.textContent='Please add at least one item.';err.classList.add('show');return}
+  const phone=document.getElementById('oPhone').value.replace(/\D/g,'');const lat=Number(document.getElementById('oLat').value),lng=Number(document.getElementById('oLng').value);
+  if(phone.length<10){err.textContent='Enter a valid mobile number.';err.classList.add('show');return}
+  if(!document.getElementById('oAddress').value.trim()){err.textContent='Please enter your delivery address.';err.classList.add('show');return}
+  const btn=document.getElementById('orderSubmit');btn.disabled=true;btn.textContent='Placing…';
+  try{
+    const orderNo='BA'+Date.now().toString().slice(-8); const refId='o_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    const subtotal=orderCart.reduce((a,x)=>a+x.price*x.qty,0);const deliveryCharge=DELIVERY_SETTINGS.enabled!==false?(subtotal>=Number(DELIVERY_SETTINGS.freeThreshold||0)?0:Number(DELIVERY_SETTINGS.fee||0)):0;const total=subtotal+deliveryCharge;
+    const paymentMethod=document.getElementById('oPayment').value; if(paymentMethod==='upi'&&!cartEffectiveUpi()){throw Error('UPI is not configured by the restaurant.');}
+    const locationToken=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    const paymentStatus=paymentMethod==='cod'?'cod_pending':'pending';
+    const orderData={orderNo,name:document.getElementById('oName').value.trim(),phone,address:document.getElementById('oAddress').value.trim(),gpsAddress:document.getElementById('oGpsAddress').value.trim(),items:orderCart,subtotal,deliveryCharge,total,paymentMethod,paymentStatus,upiId:paymentMethod==='upi'?cartEffectiveUpi():'',utr:document.getElementById('oUtr').value.trim(),status:'pending',customerUid:auth.currentUser.uid,customerEmail:auth.currentUser.email||'',locationToken,createdAt:Date.now()}; if(Number.isFinite(lat)&&Number.isFinite(lng)){orderData.latitude=lat;orderData.longitude=lng;} await db.ref('orders/'+refId).set(orderData);
+    activeLocationOrderId=refId;activeLocationToken=locationToken;
+    if(Number.isFinite(lat)&&Number.isFinite(lng)){ try{ await db.ref('customerLocations/'+refId).set({latitude:lat,longitude:lng,updatedAt:Date.now(),token:locationToken}); }catch(locErr){ console.warn('Location save skipped:',locErr); } }
+    document.getElementById('orderFormView').style.display='none';document.getElementById('orderSuccess').style.display='';document.getElementById('orderSuccessText').textContent='Your order #'+orderNo+' has been received. Restaurant will confirm it shortly.';
+    if(paymentMethod==='razorpay'&&PAYMENT_SETTINGS.razorpayKeyId){
+      setTimeout(()=>{
+        try{
+          const sc=document.createElement('script'); sc.src='https://checkout.razorpay.com/v1/checkout.js';
+          sc.onload=()=>{
+            try{
+              const rz=new Razorpay({key:PAYMENT_SETTINGS.razorpayKeyId,amount:Math.round(total*100),currency:'INR',name:PAYMENT_SETTINGS.upiName||CONFIG.businessName,description:'Bon Amigos Order #'+orderNo,handler:async r=>{
+                await db.ref('orders/'+refId).update({paymentStatus:'submitted',razorpayPaymentId:r.razorpay_payment_id,updatedAt:Date.now()});
+                alert('Payment submitted. Restaurant will confirm it.');
+              }});
+              rz.open();
+            }catch(e){console.error(e);}
+          };
+          document.head.appendChild(sc);
+        }catch(e){console.error(e);}
+      },300);
+    }
+    orderCart=[];
+    document.getElementById('orderForm').reset();
+    document.getElementById('oLat').value=''; document.getElementById('oLng').value='';
+    document.getElementById('gpsStatus').textContent='GPS not set';
+    document.getElementById('cartItems').innerHTML='';
+    const b=document.getElementById('orderSubmit'); b.disabled=false; b.textContent='Place Order';
+  }catch(x){console.error(x);err.textContent=(x && x.code==='PERMISSION_DENIED')?'Firebase permission denied. Please publish the latest database.rules.json and try again.':('Order failed: '+(x?.message||'Please try again.'));err.classList.add('show');btn.disabled=false;btn.textContent='Place Order'}
+};
+let activeLocationOrderId=null,activeLocationToken=null,locationWatchId=null;
+const shareBtn=document.getElementById('shareLiveLocation'); if(shareBtn)shareBtn.onclick=()=>{if(!activeLocationOrderId)return alert('Place an order first.');if(!navigator.geolocation)return alert('GPS unavailable');navigator.geolocation.getCurrentPosition(p=>{db.ref('customerLocations/'+activeLocationOrderId).set({latitude:p.coords.latitude,longitude:p.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}).then(()=>{document.getElementById('liveTrackStatus').textContent='Live location shared ✓';if(locationWatchId==null)locationWatchId=navigator.geolocation.watchPosition(pos=>db.ref('customerLocations/'+activeLocationOrderId).update({latitude:pos.coords.latitude,longitude:pos.coords.longitude,updatedAt:Date.now(),token:activeLocationToken}),()=>{}, {enableHighAccuracy:true,maximumAge:5000,timeout:10000})})},()=>alert('Please allow location permission'),{enableHighAccuracy:true,timeout:10000,maximumAge:0});};
+</script>
 </body>
 </html>
