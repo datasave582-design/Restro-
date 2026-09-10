@@ -297,10 +297,60 @@
   .auth-overlay{position:fixed;inset:0;background:rgba(24,18,15,.58);display:none;align-items:flex-end;justify-content:center;z-index:1200;padding:0;}
   .auth-overlay.open{display:flex;}
   .auth-card{width:min(560px,100%);background:var(--paper);border-radius:22px 22px 0 0;padding:26px 22px 30px;box-shadow:0 -20px 60px rgba(0,0,0,.2);}
+  .history-card{width:min(820px,100%);max-height:min(88vh,900px);overflow:auto;background:var(--paper);border-radius:22px;padding:26px 22px 30px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .history-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;}
+  .history-toolbar select,.history-toolbar input{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink);}
+  .history-item{border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;background:#fff;}
+  .history-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+  .history-status{display:inline-flex;padding:6px 10px;border-radius:999px;background:#f1f6ed;color:#3e5d2c;font-size:12px;font-weight:800;}
+  .history-status.cancelled{background:#fff0f2;color:#8c1732;}
+  .history-items{margin:12px 0;padding:10px 12px;background:#fbf7f1;border-radius:10px;font-size:13px;line-height:1.65;}
+  .history-total{font-size:18px;font-weight:800;}
+  .history-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .history-empty{text-align:center;padding:45px 20px;color:#75685f;}
+
   @media(min-width:700px){.auth-overlay{align-items:center;padding:20px}.auth-card{border-radius:18px;padding:30px;}}
   .auth-tabs{display:flex;gap:8px;margin:18px 0}.auth-tab{flex:1;padding:11px;border:1px solid var(--line);border-radius:10px;font-weight:800;background:#fff}.auth-tab.active{background:var(--wine);color:#fff;border-color:var(--wine);}
   .auth-note{font-size:.82rem;color:#75685f;margin:7px 0 16px;line-height:1.5}.auth-error{display:none;color:#8c1732;background:#fff0f2;border:1px solid #efc4cd;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.84rem}.auth-error.show{display:block;}
   .user-menu{display:flex;align-items:center;gap:8px;margin-left:auto;}
+
+/* ===== BON AMIGOS 2026 VISUAL REFRESH ===== */
+:root{--wine:#8f1d2c;--wine-deep:#5d0f1b;--gold:#d6a85a;--ivory:#fffaf4;--paper:#f5eee6;--ink:#241716;--line:rgba(36,23,22,.11);--shadow:0 18px 55px rgba(55,25,20,.12)}
+body{background:linear-gradient(180deg,#fffaf5 0%,#fffdf9 35%,#f7f0e8 100%);padding-bottom:76px}
+header{background:rgba(255,250,245,.88);backdrop-filter:blur(18px);border-bottom:1px solid rgba(143,29,44,.12);box-shadow:0 8px 30px rgba(55,25,20,.06)}
+.headbar{max-width:1280px;min-height:78px;padding:10px 22px;gap:20px}
+.logo{display:flex;align-items:center;gap:10px;font-size:1.55rem;color:var(--wine);letter-spacing:-.02em}
+.logo:before{content:'BA';width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--wine),#c03a4c);color:#fff;font:800 12px/1 system-ui;box-shadow:0 8px 20px rgba(143,29,44,.25)}
+nav.desktop-nav{gap:24px;font-weight:700;color:#493a35;flex:1;justify-content:center}
+nav.desktop-nav a{padding:10px 2px;transition:.2s}
+nav.desktop-nav a:after{content:'';display:block;height:2px;width:0;margin-top:5px;background:var(--gold);transition:.2s}
+nav.desktop-nav a:hover:after{width:100%}
+.head-cta{gap:8px}.head-cta .btn{padding:10px 15px;border-radius:12px}
+.btn{border-radius:13px;padding:13px 20px;box-shadow:0 7px 18px rgba(36,23,22,.07);transition:transform .2s,box-shadow .2s,background .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(36,23,22,.12)}
+.btn-primary{background:linear-gradient(135deg,var(--wine),#b62d43);box-shadow:0 10px 24px rgba(143,29,44,.25)}
+.hero{position:relative;max-width:1280px;margin:0 auto;min-height:680px!important;padding:34px 22px!important;grid-template-columns:1fr 1.08fr!important;gap:28px!important}
+.hero-copy{max-width:none;padding:54px 18px 54px 30px;position:relative;z-index:2}
+.hero-copy:before{content:'';position:absolute;left:-40px;top:70px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(214,168,90,.24),transparent 68%);z-index:-1}
+.hero-copy h1{font-size:clamp(3rem,5.2vw,5.25rem);letter-spacing:-.055em;color:#2a1916;text-wrap:balance}
+.hero-sub{font-size:1.16rem;color:var(--wine);font-weight:700;letter-spacing:.01em}
+.hero-actions{gap:11px;margin-top:10px}.hero-actions .btn{min-width:145px}
+.hero-media{min-height:610px;border-radius:30px;overflow:hidden;box-shadow:0 25px 70px rgba(49,23,18,.2);border:6px solid rgba(255,255,255,.8);transform:rotate(1deg)}
+.hero-media:after{content:'BON AMIGOS';position:absolute;right:24px;bottom:20px;color:#fff;font:700 12px system-ui;letter-spacing:.28em;text-shadow:0 2px 15px #000}
+.hero-media img{filter:saturate(1.05) contrast(1.03);transform:scale(1.02)}
+.trust-strip{background:linear-gradient(90deg,#241716,#43151e,#241716);padding:18px 0;box-shadow:inset 0 1px rgba(255,255,255,.08)}
+.trust-row{max-width:1100px;justify-content:space-around}.trust-item .num{font-size:1.8rem;color:var(--gold)}
+section{padding:82px 0}.section-head{margin-bottom:38px}.section-head h2{font-size:clamp(2rem,3vw,2.7rem);letter-spacing:-.03em}.section-head p{font-size:1rem}
+#menu{background:linear-gradient(180deg,#f7efe7,#fffaf5)}
+.dish-scroller{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;gap:20px}.dish-card{min-width:0;flex:unset;border:0;border-radius:22px;background:#fff;box-shadow:var(--shadow);transition:transform .28s ease,box-shadow .28s ease;animation:cardIn .55s both}.dish-card:hover{transform:translateY(-9px) scale(1.01);box-shadow:0 28px 65px rgba(55,25,20,.18)}
+.dish-img{height:205px}.dish-img img{transition:transform .45s ease}.dish-card:hover .dish-img img{transform:scale(1.08)}.dish-body{padding:18px}.dish-body h3{font-size:1.1rem}.price{color:var(--wine);font-size:1.08rem}.add-btn{border-radius:999px;padding:8px 14px;background:#fff7f4}.add-btn:hover{background:var(--wine)}
+.love-grid{gap:18px}.love-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 12px 30px rgba(55,25,20,.06);border-top:3px solid var(--gold);transition:.25s}.love-item:hover{transform:translateY(-5px)}
+#order{background:linear-gradient(135deg,#fff7ef,#f0e2d5)!important}.order-cta-new{background:linear-gradient(135deg,#2b1717,#651523);color:#fff;border-radius:28px;padding:42px;box-shadow:0 25px 65px rgba(55,20,20,.2)}
+footer{padding-top:65px}.mobile-nav{background:rgba(36,23,22,.96);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.1);height:70px}.mobile-nav a{color:#d9ceca}.mobile-nav a.active,.mobile-nav a:hover{color:#fff}.user-menu{top:17px!important;right:18px!important}.auth-chip{border-radius:999px!important;background:#fff!important;border:1px solid rgba(143,29,44,.18)!important;box-shadow:0 8px 22px rgba(55,25,20,.1)!important;padding:9px 13px!important;font-weight:800!important;color:var(--wine)!important}
+@keyframes cardIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@media(max-width:1050px){nav.desktop-nav{gap:14px;font-size:.87rem}.head-cta .btn-outline{display:none}.hero{grid-template-columns:1fr 1fr!important}.dish-scroller{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:899px){.headbar{min-height:66px}.hero{grid-template-columns:1fr!important;min-height:auto!important;padding:12px 14px 30px!important}.hero-copy{padding:45px 10px 24px}.hero-media{min-height:390px;transform:none;border-radius:24px}.desktop-nav,.head-cta{display:none!important}.dish-scroller{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.dish-img{height:180px}}
+@media(max-width:560px){.hero-copy h1{font-size:2.75rem}.hero-actions{display:grid;grid-template-columns:1fr 1fr}.hero-actions .btn{min-width:0;padding:12px 10px}.hero-actions .btn-primary{grid-column:1/-1}.hero-media{min-height:300px}.dish-scroller{display:flex;overflow-x:auto}.dish-card{flex:0 0 245px}.section-head h2{font-size:2rem}.order-cta-new{padding:28px 20px}}
+
 </style>
 
 <!-- ================= FIREBASE (Phase 2 — Table Reservations) =================
@@ -424,42 +474,25 @@ const RESERVE_CONFIG = {
   <div class="headbar wrap">
     <a class="logo" href="#home">Bon Amigos</a>
     <nav class="desktop-nav" aria-label="Primary">
-      <a href="#menu">Menu</a>
-      <a href="#order">Order Online</a>
-      <a href="#reserve">Book a Table</a>
-      <a href="#about">About Us</a>
-      <a href="#gallery">Gallery</a>
-      <a href="#offers">Offers</a>
-      <a href="#contact">Contact</a>
+      <a href="#menu">Menu</a><a href="#order">Order</a><a href="#reserve">Book a Table</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a>
     </nav>
-    <div class="head-cta">
-      <a class="btn btn-outline" href="#reserve">Book a Table</a>
-      <a class="btn btn-primary" href="#order">Order Online</a>
-    </div>
+    <div class="head-cta"><a class="btn btn-outline" href="#reserve">📅 Book Table</a><a class="btn btn-primary" href="#order">🛍️ Order Now</a></div>
   </div>
 </header>
 
 <main id="home">
 
   <!-- ================= HERO ================= -->
-  <section class="hero" style="padding:0;">
+  <section class="hero">
     <div class="hero-copy">
+      <div style="display:inline-flex;align-items:center;gap:8px;color:#7b624c;font-weight:800;font-size:.78rem;letter-spacing:.16em;text-transform:uppercase">✦ Welcome to Bon Amigos</div>
       <h1 id="pageHeadline"></h1>
       <p class="hero-sub" id="pageSub"></p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#menu">View Menu</a>
-        <a class="btn btn-outline" href="#order">Order Online</a>
-        <a class="btn btn-outline" href="#reserve">Book a Table</a>
-      </div>
-      <div class="hero-actions-secondary">
-        <a id="waHero" href="#" target="_blank" rel="noopener">WhatsApp Us</a>
-        <a id="mapsHero" href="#" target="_blank" rel="noopener">Get Directions</a>
-      </div>
+      <p style="font-size:1.03rem;color:#665852;max-width:520px">A beautiful place for pizza, pan-Asian favourites, cafe treats and memorable time with friends. Dine in or order online.</p>
+      <div class="hero-actions"><a class="btn btn-primary" href="#order">🛍️ Order Online</a><a class="btn btn-outline" href="#reserve">📅 Book a Table</a><a class="btn btn-outline" href="#menu">🍽️ Explore Menu</a></div>
+      <div class="hero-actions-secondary"><a id="waHero" href="#" target="_blank" rel="noopener">💬 WhatsApp</a><a id="mapsHero" href="#" target="_blank" rel="noopener">📍 Directions</a></div>
     </div>
-    <div class="hero-media">
-      <!-- REPLACE IMAGE: real hero photo of the restaurant/dish -->
-      <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1200" alt="Signature dish plated at Bon Amigos">
-    </div>
+    <div class="hero-media"><img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=1400" alt="Bon Amigos restaurant interior"></div>
   </section>
 
   <!-- ================= TRUST STRIP ================= -->
@@ -517,17 +550,12 @@ const RESERVE_CONFIG = {
 
   <!-- ================= ORDER / RESERVE CTA BAND ================= -->
   <section class="alt-bg" id="order">
-    <div class="wrap" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;">
-      <div style="max-width:480px;">
-        <h2 style="font-size:1.6rem;">Ready to order or reserve a table?</h2>
-        <p style="color:#5c4f47;margin-top:8px;">Choose your favourites, add your delivery details and place an order directly from the website.</p>
+    <div class="wrap"><div class="order-cta-new" id="reserve">
+      <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:center;justify-content:space-between">
+        <div style="max-width:620px"><div style="color:#e0b86d;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.75rem">Your table. Your order. Your way.</div><h2 style="font-size:clamp(2rem,4vw,3rem);margin-top:8px">Ready for a great meal?</h2><p style="color:#e8d8d1;margin:10px 0 0">Order your favourites online or reserve a table in a few simple steps.</p></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="openOrder" type="button">🛍️ Order Online</button><button class="btn btn-outline" style="background:#fff;color:#241716;border-color:#fff" type="button" onclick="openReserveModal()">📅 Book a Table</button><a class="btn btn-outline" style="border-color:#ffffff55;color:#fff" id="waReserve" href="#" target="_blank" rel="noopener">💬 WhatsApp</a><a class="btn btn-outline" style="border-color:#ffffff55;color:#fff" id="callNow" href="tel:">☎ Call</a></div>
       </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;" id="reserve">
-        <button class="btn btn-primary" id="openOrder" type="button">Order Online</button>
-        <a class="btn btn-outline" id="waReserve" href="#" target="_blank" rel="noopener">Book via WhatsApp</a>
-        <a class="btn btn-outline" id="callNow" href="tel:">Call Now</a>
-      </div>
-    </div>
+    </div></div>
   </section>
 
 </main>
@@ -574,7 +602,7 @@ const RESERVE_CONFIG = {
 </a>
 
 <!-- ================= STICKY MOBILE BOTTOM NAV ================= -->
-<div class="user-menu" style="position:fixed;right:14px;top:14px;z-index:1100;"><button id="customerAccountBtn" class="auth-chip" type="button">👤 Login</button></div>
+<div class="user-menu" style="position:fixed;right:14px;top:14px;z-index:1100;display:flex;gap:8px;align-items:center;"><button id="orderHistoryBtn" class="auth-chip" type="button" style="display:none">📦 Orders</button><button id="customerAccountBtn" class="auth-chip" type="button">👤 Login</button></div>
 <nav class="mobile-nav" aria-label="Mobile primary">
   <a href="#home" class="active">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
@@ -642,6 +670,20 @@ const RESERVE_CONFIG = {
       </form>
     </div>
     <div id="orderSuccess" style="display:none"><h2>Order Placed 🎉</h2><p id="orderSuccessText"></p><p id="liveTrackStatus" class="modal-sub">Your GPS location has been sent to the restaurant.</p><button class="btn btn-outline" id="shareLiveLocation" type="button">📍 Share Live Location</button> <button class="btn btn-primary" id="orderDone">Done</button></div>
+  </div>
+</div>
+
+<!-- ================= CUSTOMER ORDER HISTORY ================= -->
+<div class="modal-overlay" id="historyOverlay">
+  <div class="history-card" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <button class="modal-close" id="historyClose" aria-label="Close">✕</button>
+    <h2 id="historyTitle">My Orders</h2>
+    <p class="modal-sub">Your complete order history, status and order details.</p>
+    <div class="history-toolbar">
+      <select id="historyStatus"><option value="all">All orders</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="preparing">Preparing</option><option value="ready">Ready</option><option value="out_for_delivery">Out for delivery</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option></select>
+      <input id="historySearch" type="search" placeholder="Search order no. or item…">
+    </div>
+    <div id="historyList"></div>
   </div>
 </div>
 
@@ -978,7 +1020,43 @@ let lastReservationStatus={};
 let myReservationListener=null;
 function customerToast(title,message){let el=document.getElementById('customerToast');if(!el){el=document.createElement('div');el.id='customerToast';el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;z-index:9999;max-width:min(92vw,520px);background:#241716;color:#fff;border-radius:18px;padding:15px 18px;box-shadow:0 18px 50px #0006;transition:.25s;font-weight:700';document.body.appendChild(el);}el.innerHTML='<div style="font-size:16px">'+title+'</div><div style="font-size:13px;font-weight:500;opacity:.85;margin-top:3px">'+message+'</div>';requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='translate(-50%,0)'});setTimeout(()=>{el.style.opacity='0';el.style.transform='translate(-50%,20px)'},5000);try{if('Notification' in window && Notification.permission==='granted')new Notification(title,{body:message});}catch(e){}}
 let lastCustomerOrders={};
-function watchMyOrders(){const u=auth.currentUser;if(!u)return;db.ref('orders').orderByChild('customerUid').equalTo(u.uid).on('value',s=>{const v=s.val()||{};Object.entries(v).forEach(([id,o])=>{const old=lastCustomerOrders[id]||{};if(o.riderId&&o.riderId!==old.riderId){customerToast('🚴 Rider assigned','Your order '+(o.orderNo?'#'+o.orderNo:'')+' has been assigned to a rider.');}if(['out_for_delivery'].includes(o.status)&&old.status!==o.status){customerToast('🛵 Order on the way','Your Bon Amigos order is out for delivery.');}if(o.status==='delivered'&&old.status!==o.status){customerToast('✅ Order delivered','Thank you for ordering from Bon Amigos.');}});lastCustomerOrders=v;});}
+function watchMyOrders(){
+  const u=auth.currentUser;if(!u)return;
+  db.ref('orders').orderByChild('customerUid').equalTo(u.uid).on('value',s=>{
+    const v=s.val()||{};
+    customerOrders=Object.entries(v).map(([id,o])=>({id,...(o||{})})).sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    customerOrders.forEach(o=>{const old=lastCustomerOrders[o.id]||{};if(o.riderId&&o.riderId!==old.riderId){customerToast('🚴 Rider assigned','Your order '+(o.orderNo?'#'+o.orderNo:'')+' has been assigned to a rider.');}if(o.status==='out_for_delivery'&&old.status!==o.status){customerToast('🛵 Order on the way','Your Bon Amigos order is out for delivery.');}if(o.status==='delivered'&&old.status!==o.status){customerToast('✅ Order delivered','Thank you for ordering from Bon Amigos.');}});
+    lastCustomerOrders=v;
+    const hb=document.getElementById('orderHistoryBtn');if(hb)hb.style.display=customerOrders.length?'':'none';
+    renderOrderHistory();
+  });
+}
+let customerOrders=[];
+function historyStatusLabel(status){return String(status||'pending').replaceAll('_',' ').replace(/\b\w/g,m=>m.toUpperCase());}
+function escapeHtml(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));}
+function renderOrderHistory(){
+  const box=document.getElementById('historyList');if(!box)return;
+  const filter=document.getElementById('historyStatus')?.value||'all';
+  const q=(document.getElementById('historySearch')?.value||'').trim().toLowerCase();
+  const list=customerOrders.filter(o=>{
+    if(filter!=='all'&&String(o.status||'pending')!==filter)return false;
+    if(q){const hay=[o.orderNo,o.name,o.address,...(Array.isArray(o.items)?o.items.map(i=>i.name):Object.values(o.items||{}).map(i=>i?.name))].join(' ').toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  if(!list.length){box.innerHTML='<div class="history-empty"><div style="font-size:42px">📦</div><h3>No orders found</h3><p>Your completed and current orders will appear here.</p></div>';return;}
+  box.innerHTML=list.map(o=>{
+    const items=Array.isArray(o.items)?o.items:Object.values(o.items||{});
+    const date=o.createdAt?new Date(Number(o.createdAt)).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'Date unavailable';
+    const status=String(o.status||'pending');
+    const itemText=items.map(i=>`${escapeHtml(i?.name||'Item')} × ${Number(i?.qty||1)}`).join('<br>')||'Order items unavailable';
+    const rider=o.riderName||o.riderId||'';
+    return `<article class="history-item"><div class="history-head"><div><div style="font-weight:800;font-size:17px">Order #${escapeHtml(o.orderNo||o.id.slice(-7))}</div><div class="modal-sub">${escapeHtml(date)}</div></div><span class="history-status ${status==='cancelled'?'cancelled':''}">${escapeHtml(historyStatusLabel(status))}</span></div><div class="history-items">${itemText}</div><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div class="modal-sub">Payment: ${escapeHtml(String(o.paymentMethod||'COD').toUpperCase())}${o.paymentStatus?' • '+escapeHtml(historyStatusLabel(o.paymentStatus)):''}</div>${rider?`<div class="modal-sub">Rider: ${escapeHtml(rider)}</div>`:''}</div><div class="history-total">₹${Number(o.total||0).toFixed(2)}</div></div><div class="history-actions"><button class="btn btn-outline" type="button" onclick="viewCustomerOrder('${escapeHtml(o.id)}')">View details</button>${status==='delivered'?`<button class="btn btn-primary" type="button" onclick="reorderCustomerOrder('${escapeHtml(o.id)}')">Reorder</button>`:''}</div></article>`;
+  }).join('');
+}
+function openOrderHistory(){if(!auth.currentUser){pendingCustomerAction='history';openCustomerAuth('login');return;}document.getElementById('historyOverlay').classList.add('open');document.body.style.overflow='hidden';renderOrderHistory();}
+function viewCustomerOrder(id){const o=customerOrders.find(x=>x.id===id);if(!o)return;const items=Array.isArray(o.items)?o.items:Object.values(o.items||{});const details=items.map(i=>`${i?.name||'Item'} × ${Number(i?.qty||1)}`).join('\n');alert(`Order #${o.orderNo||id}\nStatus: ${historyStatusLabel(o.status)}\nTotal: ₹${Number(o.total||0).toFixed(2)}\nPayment: ${String(o.paymentMethod||'COD').toUpperCase()}\n\nItems:\n${details}`);}
+function reorderCustomerOrder(id){const o=customerOrders.find(x=>x.id===id);if(!o)return;const items=Array.isArray(o.items)?o.items:Object.values(o.items||{});orderCart=items.map(i=>({name:i.name||'Item',price:Number(i.price||0),qty:Number(i.qty||1),productId:i.productId||''}));renderOrderCart();document.getElementById('historyOverlay').classList.remove('open');document.getElementById('orderOverlay').classList.add('open');document.body.style.overflow='hidden';}
+
 function requestCustomerNotifications(){try{if('Notification' in window && Notification.permission==='default')Notification.requestPermission().catch(()=>{});}catch(e){}}
 
 function watchMyTableReservations(){
@@ -1050,6 +1128,13 @@ const authSubmit=document.getElementById('authSubmit');
 const authError=document.getElementById('authError');
 const accountBtn=document.getElementById('customerAccountBtn');
 const googleLoginBtn=document.getElementById('googleLoginBtn');
+const historyBtn=document.getElementById('orderHistoryBtn');
+const historyOverlay=document.getElementById('historyOverlay');
+historyBtn.onclick=openOrderHistory;
+document.getElementById('historyClose').onclick=()=>{historyOverlay.classList.remove('open');if(!reserveOverlay.classList.contains('open')&&!orderOverlay.classList.contains('open'))document.body.style.overflow='';};
+historyOverlay.addEventListener('click',e=>{if(e.target===historyOverlay){historyOverlay.classList.remove('open');document.body.style.overflow='';}});
+document.getElementById('historyStatus').onchange=renderOrderHistory;
+document.getElementById('historySearch').oninput=renderOrderHistory;
 let authMode='login';
 let completingGoogleProfile=false;
 function openCustomerAuth(mode='login'){
@@ -1077,6 +1162,7 @@ function continuePendingAction(){
   closeCustomerAuth(); requestCustomerNotifications(); watchMyOrders(); updateAuthMode();
   if(pendingCustomerAction==='order'){pendingCustomerAction=null;renderOrderCart();orderOverlay.classList.add('open');document.body.style.overflow='hidden';}
   else if(pendingCustomerAction==='reserve'){pendingCustomerAction=null;openReserveModal();}
+  else if(pendingCustomerAction==='history'){pendingCustomerAction=null;openOrderHistory();}
 }
 async function completeGoogleProfile(user){
   const snap=await db.ref('customers/'+user.uid).once('value');
@@ -1151,8 +1237,8 @@ auth.getRedirectResult().then(async result=>{if(result&&result.user)await comple
 auth.onAuthStateChanged(async user=>{
   if(user){
     try{const snap=await db.ref('customers/'+user.uid).once('value');customerProfile=snap.val()||{};}catch(e){customerProfile={};}
-    accountBtn.textContent='👤 '+(customerProfile.mobile||user.email||'Account');accountBtn.classList.add('logged');watchMyTableReservations();
-  }else{customerProfile={};accountBtn.textContent='👤 Login';accountBtn.classList.remove('logged');if(myReservationListener){myReservationListener=null;}}
+    accountBtn.textContent='👤 '+(customerProfile.mobile||user.email||'Account');accountBtn.classList.add('logged');if(historyBtn)historyBtn.style.display='';watchMyOrders();watchMyTableReservations();
+  }else{customerProfile={};customerOrders=[];accountBtn.textContent='👤 Login';accountBtn.classList.remove('logged');if(historyBtn)historyBtn.style.display='none';if(myReservationListener){myReservationListener=null;}}
 });
 </script>
 
