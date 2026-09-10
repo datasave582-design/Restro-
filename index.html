@@ -977,6 +977,8 @@ db.ref('waitingDisplay').on('value',s=>{waitingDisplay=s.val()||{};});
 let lastReservationStatus={};
 let myReservationListener=null;
 function customerToast(title,message){let el=document.getElementById('customerToast');if(!el){el=document.createElement('div');el.id='customerToast';el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;z-index:9999;max-width:min(92vw,520px);background:#241716;color:#fff;border-radius:18px;padding:15px 18px;box-shadow:0 18px 50px #0006;transition:.25s;font-weight:700';document.body.appendChild(el);}el.innerHTML='<div style="font-size:16px">'+title+'</div><div style="font-size:13px;font-weight:500;opacity:.85;margin-top:3px">'+message+'</div>';requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='translate(-50%,0)'});setTimeout(()=>{el.style.opacity='0';el.style.transform='translate(-50%,20px)'},5000);try{if('Notification' in window && Notification.permission==='granted')new Notification(title,{body:message});}catch(e){}}
+let lastCustomerOrders={};
+function watchMyOrders(){const u=auth.currentUser;if(!u)return;db.ref('orders').orderByChild('customerUid').equalTo(u.uid).on('value',s=>{const v=s.val()||{};Object.entries(v).forEach(([id,o])=>{const old=lastCustomerOrders[id]||{};if(o.riderId&&o.riderId!==old.riderId){customerToast('🚴 Rider assigned','Your order '+(o.orderNo?'#'+o.orderNo:'')+' has been assigned to a rider.');}if(['out_for_delivery'].includes(o.status)&&old.status!==o.status){customerToast('🛵 Order on the way','Your Bon Amigos order is out for delivery.');}if(o.status==='delivered'&&old.status!==o.status){customerToast('✅ Order delivered','Thank you for ordering from Bon Amigos.');}});lastCustomerOrders=v;});}
 function requestCustomerNotifications(){try{if('Notification' in window && Notification.permission==='default')Notification.requestPermission().catch(()=>{});}catch(e){}}
 
 function watchMyTableReservations(){
@@ -1072,7 +1074,7 @@ authOverlay.addEventListener('click',e=>{if(e.target===authOverlay&&!completingG
 accountBtn.onclick=()=>{if(auth.currentUser){if(confirm('Log out from Bon Amigos?'))auth.signOut();}else openCustomerAuth('login')};
 
 function continuePendingAction(){
-  closeCustomerAuth(); requestCustomerNotifications(); updateAuthMode();
+  closeCustomerAuth(); requestCustomerNotifications(); watchMyOrders(); updateAuthMode();
   if(pendingCustomerAction==='order'){pendingCustomerAction=null;renderOrderCart();orderOverlay.classList.add('open');document.body.style.overflow='hidden';}
   else if(pendingCustomerAction==='reserve'){pendingCustomerAction=null;openReserveModal();}
 }

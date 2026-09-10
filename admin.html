@@ -43,7 +43,31 @@ const statusPill=s=>{s=s||'pending';let c=['delivered','confirmed','paid'].inclu
 function go(id){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));const el=$(id);if(el)el.classList.add('active');document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.section===id));const titles={dashboard:'Dashboard',orders:'Order Control Center',bookings:'Reservations',tables:'Tables',products:'Products & Menu',captains:'Captains',riders:'Riders',payments:'Payments',settings:'Settings'};$('pageTitle').textContent=titles[id]||'Dashboard';location.hash=id;$('side').classList.remove('open');if(id==='orders')renderOrders();if(id==='products')renderProducts()}
 $('nav').addEventListener('click',e=>{const b=e.target.closest('button[data-section]');if(b)go(b.dataset.section)});$('menu').onclick=()=>$('side').classList.toggle('open');window.go=go;
 async function load(){try{const keys=Object.keys(data);const ss=await Promise.all(keys.map(k=>db.ref(k).once('value')));keys.forEach((k,i)=>data[k]=ss[i].val()||{});renderAll();return true}catch(e){console.error('Load failed',e);return false}}
-function startRealtime(){if(listenersStarted)return;listenersStarted=true;setTimeout(refreshWaitingDisplay,500);['orders','tables','reservations','staff','riderLocations','customerLocations','products','settings'].forEach(k=>db.ref(k).on('value',s=>{data[k]=s.val()||{};renderAll()}))}
+let knownOrderIds=new Set(); let dispatcherBusy=false; let audioCtx=null;
+function armSound(){try{if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume();}catch(e){}}
+function beep(count=2){try{armSound(); if(!audioCtx)return; let t=audioCtx.currentTime; for(let i=0;i<count;i++){let o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=i%2?880:660;o.type='sine';g.gain.setValueAtTime(.0001,t+i*.18);g.gain.exponentialRampToValueAtTime(.18,t+i*.18+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.18+.14);o.connect(g);g.connect(audioCtx.destination);o.start(t+i*.18);o.stop(t+i*.18+.15);}}catch(e){}}
+function notify(title,body){try{if('Notification' in window && Notification.permission==='granted') new Notification(title,{body});}catch(e){}}
+async function requestNotify(){try{if('Notification' in window && Notification.permission==='default') await Notification.requestPermission();}catch(e){} armSound();}
+document.addEventListener('click',requestNotify,{once:true});
+async function autoDispatchOrders(){
+ if(dispatcherBusy)return; dispatcherBusy=true;
+ try{
+  const orders=arr(data.orders), staff=arr(data.staff), locs=data.riderLocations||{};
+  const riders=staff.filter(r=>r.role==='rider'&&r.active!==false&&r.dutyOn===true&&locs[r.id]?.online===true);
+  if(!riders.length)return;
+  for(const o of orders.filter(x=>!x.riderId && ['pending','confirmed','preparing'].includes(x.status||'pending')).sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0))){
+   const counts={}; riders.forEach(r=>counts[r.id]=orders.filter(x=>x.riderId===r.id&&!['delivered','cancelled'].includes(x.status)).length);
+   const r=[...riders].sort((a,b)=>counts[a.id]-counts[b.id])[0]; if(!r)continue;
+   await db.ref('orders/'+o.id).update({riderId:r.id,status:'assigned',riderAssignedAt:Date.now(),riderAssignedBy:'auto',updatedAt:Date.now()});
+  }
+ }catch(e){} finally{dispatcherBusy=false;}
+}
+async function watchNewOrders(){
+ try{const snap=await db.ref('orders').once('value');knownOrderIds=new Set(Object.keys(snap.val()||{}));}catch(e){}
+ db.ref('orders').on('child_added',snap=>{const o=snap.val()||{}; if(knownOrderIds.has(snap.key))return; knownOrderIds.add(snap.key); if((o.status||'pending')==='pending'){beep(3);notify('🔔 New Bon Amigos Order','#'+(o.orderNo||snap.key.slice(0,7))+' · ₹'+(o.total||0));} autoDispatchOrders();});
+}
+
+function startRealtime(){if(listenersStarted)return;listenersStarted=true;setTimeout(refreshWaitingDisplay,500);watchNewOrders();['orders','tables','reservations','staff','riderLocations','customerLocations','products','settings'].forEach(k=>db.ref(k).on('value',s=>{data[k]=s.val()||{};renderAll();if(k==='orders'||k==='staff'||k==='riderLocations')autoDispatchOrders();}))}
 function renderAll(){renderStats();renderOrders();renderBookings();renderTables();renderProducts();renderStaff();renderPayments();renderSettings();renderDashboard()}
 function renderStats(){const orders=arr(data.orders),tables=arr(data.tables),bookings=arr(data.reservations),staff=arr(data.staff);$('sOrders').textContent=orders.length;$('sPendingOrders').textContent=orders.filter(o=>['pending','confirmed','preparing'].includes(o.status||'pending')).length;const sales=orders.filter(o=>o.status==='delivered'&&sameDay(o.createdAt)).reduce((a,o)=>a+Number(o.total||0),0);$('sSales').textContent=money(sales);$('sBookings').textContent=bookings.filter(x=>x.date===today()&&x.status!=='cancelled').length;$('sFree').textContent=tables.filter(x=>(x.status||'free')==='free').length;$('sStaff').textContent=staff.filter(x=>x.active!==false).length;$('kOccupied').textContent=tables.filter(x=>x.status==='occupied').length;$('kBookings').textContent=bookings.filter(x=>x.status==='pending').length;$('kOnline').textContent=staff.filter(x=>x.role==='rider'&&x.active!==false&&online(x.id)).length}
 function sameDay(t){if(!t)return false;const d=new Date(Number(t));return d.toISOString().slice(0,10)===today()}
